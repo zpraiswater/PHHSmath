@@ -73,6 +73,10 @@
         </div>
         <div class="col">
           <label>&nbsp;</label>
+          <button id="reveal">Reveal Attempted Solutions</button>
+        </div>
+        <div class="col">
+          <label>&nbsp;</label>
           <button id="printBtn">Print / Save PDF</button>
         </div>
       </div>
@@ -89,7 +93,7 @@
 
   <script>
     // ======= CONFIG: paste your Apps Script web app URL here to enable submissions =======
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXBXnWc5GiOu2DkxGiLQDP_vXfLMmWG4lVBUHUN_kRBfXU840qk0xxWyhlqVS8mBtr/exec"; // e.g., https://script.google.com/macros/s/AKfycb.../exec
+    const SCRIPT_URL = ""; // e.g., https://script.google.com/macros/s/AKfycb.../exec
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
@@ -120,7 +124,12 @@
     // ======= GCD helpers =======
     function igcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ const t=b; b=a%b; a=t; } return a||0; }
     function polyGcdCoef([c0,c1,c2]){ const arr=[Math.abs(c0),Math.abs(c1),Math.abs(c2)].filter(v=>v!==0); if(arr.length===0) return 0; return arr.reduce((g,v)=>igcd(g,v)); }
-    function polyGcdVarPow([c0,c1,c2]){ if(c0!==0) return 0; if(c1!==0) return 1; if(c2!==0) return 2; return 0; }
+    function polyGcdVarPow([c0,c1,c2]){ // minimum power of x across nonzero terms
+      if(c0!==0) return 0; // has constant term
+      if(c1!==0) return 1; // all terms have at least one x
+      if(c2!==0) return 2; // only x^2 term present (we avoid monomials elsewhere)
+      return 0;
+    }
 
     // ======= Problem Generators (order hidden to students) =======
     function genGCF(rand){
@@ -129,7 +138,7 @@
       let A=randint(rand,1,6), B=randint(rand,1,8), C=randint(rand,1,9);
       if(coin(rand)) B*=-1; if(coin(rand)) C*=-1;
       const poly = [ g*A, (pow<=1? g*B : 0), (pow===0? g*C : 0) ];
-      if((poly[0]===0)+(poly[1]===0)+(poly[2]===0) > 1) return genGCF(rand); // avoid single-term
+      if((poly[0]===0)+(poly[1]===0)+(poly[2]===0) > 1) return genGCF(rand); // avoid monomials/binomials with one term
       const sample = `(${g}${pow>0?`x${pow===1?'':`^${pow}`}`:''})(${polyToHTML(poly[2]/(pow?1:1), poly[1]/g, poly[0]/g)})`;
       return makeProblem(poly, sample);
     }
@@ -202,9 +211,11 @@
     const sidEl = document.getElementById('sid');
     const hashIdEl = document.getElementById('hashId');
     const btnRegen = document.getElementById('regen');
+    const btnReveal = document.getElementById('reveal');
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
     const scoreEl = document.getElementById('score');
+    let hasChecked = false;
 
     function currentSeed(){ return (dateEl.value || chicagoISO()); }
 
@@ -215,6 +226,7 @@
       shuffle(rand,set);
       renderSet(set);
       const url = new URL(location.href); url.searchParams.set('d', dateEl.value || chicagoISO()); history.replaceState({}, '', url);
+      hasChecked = false;
     }
 
     function renderSet(set){
@@ -284,6 +296,7 @@
       }
       scoreEl.textContent = `Score: ${correct}/${set.length}`;
       btnSubmit.disabled = false;
+      hasChecked = true;
       return correct;
     }
 
@@ -314,6 +327,14 @@
     chicagoOnLoad();
 
     btnRegen.addEventListener('click', generate);
+    btnReveal.addEventListener('click', ()=>{
+      if(!hasChecked){ alert('Check answers first. Solutions appear only for attempted problems.'); return; }
+      (window.__currentSet||[]).forEach((_,i)=>{
+        const val = document.getElementById(`ans-${i}`).value.trim();
+        const det = document.getElementById(`sol-${i}`);
+        if(val){ det.style.display='block'; det.open = true; }
+      });
+    });
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
     btnCheck.addEventListener('click', checkAnswers);
     btnSubmit.addEventListener('click', submitResults);
