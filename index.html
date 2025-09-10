@@ -3,31 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PHHS Daily Factoring Review (AI Generator)</title>
-  <meta name="description" content="Generates 4 factoring problems of different types each day with solutions — reproducible by date. Optional teacher date preview." />
-  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  <title>PHHS Daily Factoring Review (No-CDN, Answer Checker)</title>
+  <meta name="description" content="Generates 4 factoring problems of different types each day with solutions — no MathJax required. Includes student answer inputs, checker, and optional submission to a Google Sheet via Apps Script." />
   <style>
     :root{
-      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#38c172; --warn:#f9ac3d;
+      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#38c172; --warn:#f9ac3d; --err:#ef6666;
       --border: #22305e;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{
-      margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif;
-      background: radial-gradient(1200px 900px at 10% 0%, #15224d 0%, var(--bg) 60%);
-      color:var(--ink);
-    }
+    body{margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Inter, sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #15224d 0%, var(--bg) 60%); color:var(--ink)}
     header{padding:24px 20px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
     h1{margin:0; font-size: clamp(1.2rem, 2.2vw + .6rem, 2rem); letter-spacing:.3px}
-    .tag{font-size:.85rem; color:var(--muted)}
     main{max-width:1100px; margin:0 auto; padding: 0 16px 48px}
     .panel{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow: 0 10px 30px rgba(0,0,0,.35)}
     .controls{display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:12px; align-items:end}
     .controls .col{display:flex; flex-direction:column; gap:6px}
     label{font-size:.8rem; color:var(--muted)}
     input[type="date"], input[type="text"], select{height:40px; border:1px solid var(--border); border-radius:10px; background:#0b1330; color:var(--ink); padding:0 12px}
+    input[type="number"]{height:40px; border:1px solid var(--border); border-radius:10px; background:#0b1330; color:var(--ink); padding:0 12px}
+    input.answer{width:100%;}
     button{height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#13204d; color:var(--ink); font-weight:600; cursor:pointer}
     button:hover{background:#192a63}
     .btn-primary{background:linear-gradient(180deg,#2b56cc,#2348ac); border-color:#2b56cc}
@@ -45,18 +40,17 @@
     .pill{padding:2px 8px; border-radius:999px; border:1px solid var(--border); background:#0b1330; color:#cdd7ff; font-size:.75rem}
     .footer{margin-top:16px; display:flex; gap:10px; align-items:center; justify-content:space-between}
     .footnote{color:var(--muted); font-size:.8rem}
-    @media (max-width: 860px){
-      .controls{grid-template-columns: repeat(2,minmax(0,1fr))}
-      .grid{grid-template-columns: 1fr}
-    }
+    @media (max-width: 860px){.controls{grid-template-columns: repeat(2,minmax(0,1fr))} .grid{grid-template-columns: 1fr}}
     .kbd{font: 600 .78rem ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; color:#d5e2ff; background:#0f1a3f; border:1px solid var(--border); border-bottom-color:#192a63; padding:2px 6px; border-radius:7px}
+    .status{font-weight:700}
+    .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
   </style>
 </head>
 <body>
   <header>
     <div>
       <h1>PHHS Daily Factoring Review</h1>
-      <div class="tag">4 problems • 4 types • reproducible by date • step-by-step solutions</div>
+      <div class="help">No MathJax required • Deterministic by date • Answer checker • Optional submit to Google Sheet</div>
     </div>
   </header>
 
@@ -72,6 +66,14 @@
           <input id="seed" type="text" placeholder="e.g., blockB or 3rdHour" />
         </div>
         <div class="col">
+          <label for="sid">Student Number</label>
+          <input id="sid" type="text" placeholder="e.g., 123456" />
+        </div>
+        <div class="col">
+          <label>&nbsp;</label>
+          <label class="row" style="gap:8px; font-size:.9rem"><input type="checkbox" id="hashId"> Hash ID before submit</label>
+        </div>
+        <div class="col">
           <label>&nbsp;</label>
           <button id="regen" class="btn-primary">Generate Set</button>
         </div>
@@ -79,193 +81,172 @@
           <label>&nbsp;</label>
           <button id="reveal" class="btn-ghost">Reveal All Solutions</button>
         </div>
-        <div class="col">
-          <label>&nbsp;</label>
-          <button id="copyLaTeX" class="btn-ghost">Copy Problems (LaTeX)</button>
-        </div>
-        <div class="col">
-          <label>&nbsp;</label>
-          <button id="printBtn" class="btn-ghost">Print / Save PDF</button>
-        </div>
       </div>
-      <div class="help" style="margin-top:10px">Tip: The same date + teacher seed yields the same set. Share the URL to lock in a day’s work (uses <span class="kbd">?d=YYYY-MM-DD&k=seed</span>).</div>
+
+      <div class="help" style="margin-top:10px">The same date + seed yields the same set. Share the URL with <span class="kbd">?d=YYYY-MM-DD&k=seed</span>.</div>
       <div class="grid" id="problems"></div>
+
+      <div class="row" style="margin-top:12px">
+        <button id="checkBtn" class="btn-primary">Check Answers</button>
+        <button id="submitBtn" class="btn-ghost" disabled>Submit Results</button>
+        <span id="score" class="status"></span>
+      </div>
+
       <div class="footer">
         <div class="row">
-          <span class="pill">Types: GCF • Difference of Squares • Trinomial (a=1) • Trinomial (a>1)</span>
+          <span class="pill">Four types mixed daily (hidden)</span>
         </div>
-        <div class="footnote">Built-in generator (deterministic); AI hints optional via local rules. No student data stored.</div>
+        <div class="footnote">To collect results, deploy the included Google Apps Script endpoint and paste the URL into the code.</div>
       </div>
     </section>
   </main>
 
   <script>
-    // ---------- Seeded RNG (xmur3 + mulberry32) ----------
-    function xmur3(str) {
-      let h = 1779033703 ^ str.length;
-      for (let i = 0; i < str.length; i++) {
-        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
-        h = (h << 13) | (h >>> 19);
-      }
-      return function() {
-        h = Math.imul(h ^ (h >>> 16), 2246822507);
-        h = Math.imul(h ^ (h >>> 13), 3266489909);
-        return (h ^= h >>> 16) >>> 0;
-      };
-    }
-    function mulberry32(a) {
-      return function() {
-        let t = (a += 0x6d2b79f5);
-        t = Math.imul(t ^ (t >>> 15), t | 1);
-        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-      };
-    }
-    function seededRand(seedStr){
-      const seed = xmur3(seedStr)();
-      return mulberry32(seed);
-    }
+    // ======= CONFIG: paste your Apps Script web app URL here to enable submissions =======
+    const SCRIPT_URL = ""; // e.g., https://script.google.com/macros/s/AKfycb.../exec
 
-    // ---------- Utilities ----------
-    function sample(rand, arr){ return arr[Math.floor(rand()*arr.length)]; }
+    // ======= Seeded RNG (xmur3 + mulberry32) =======
+    function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
+    function mulberry32(a) { return function(){ let t = (a += 0x6d2b79f5); t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+    function seededRand(seedStr){ const seed = xmur3(seedStr)(); return mulberry32(seed); }
+
+    // ======= Utilities =======
     function randint(rand, min, max){ return Math.floor(rand()*(max-min+1))+min; }
     function coin(rand){ return rand()<0.5; }
+    function shuffle(rand, arr){ for(let i=arr.length-1;i>0;i--){ const j=Math.floor(rand()*(i+1)); [arr[i],arr[j]]=[arr[j],arr[i]];} return arr; }
 
-    function texPoly(coeffs){
-      // coeffs for ax^2 + bx + c -> [a,b,c]
-      const [a,b,c]=coeffs;
-      let parts=[];
-      function term(coef, pow){
-        if(coef===0) return null;
-        let sign = coef<0 ? '-' : '+';
-        let abs = Math.abs(coef);
-        if(pow===0){
-          return (parts.length? ' ' + sign + ' ' : (coef<0?'-':'')) + abs;
-        }else if(pow===1){
-          const cstr = abs===1? '' : abs;
-          return (parts.length? ' ' + sign + ' ' : (coef<0?'-':'')) + cstr + 'x';
-        }else{
-          const cstr = abs===1? '' : abs;
-          return (parts.length? ' ' + sign + ' ' : (coef<0?'-':'')) + cstr + 'x^{'+pow+'}';
-        }
+    // HTML-rendered polynomial like ax^2 + bx + c (no MathJax)
+    function polyToHTML(a,b,c){
+      const parts=[];
+      function addTerm(coef, pow){
+        if(coef===0) return;
+        const sign = coef<0 ? '-' : (parts.length? '+' : '');
+        const abs = Math.abs(coef);
+        if(pow===0){ parts.push(`${sign} ${abs}`.trim()); return; }
+        const coefStr = (abs===1? '' : abs);
+        const xStr = pow===1 ? 'x' : `x<sup>${pow}</sup>`;
+        parts.push(`${sign} ${coefStr}${xStr}`.trim());
       }
-      const t2 = term(a,2); if(t2) parts.push(t2);
-      const t1 = term(b,1); if(t1) parts.push(t1);
-      const t0 = term(c,0); if(t0) parts.push(t0);
-      return parts.join('');
+      addTerm(a,2); addTerm(b,1); addTerm(c,0);
+      return parts.join(' ').replace(/\+ -/g,'- ');
     }
 
-    function simplifySigns(str){
-      return str.replace(/\+\s*-\s*/g,'- ').replace(/-\s*-\s*/g,'+ ');
-    }
+    // ======= Problem Generators (hidden types) =======
+    // We store the canonical coefficients [a,b,c] and a sample factored form for the reveal.
 
-    // ---------- Problem Generators ----------
     function genGCF(rand){
-      // Form: ax^2 + bx + c OR 3-term with common numeric factor (and maybe x)
-      const g = randint(rand,2,9); // numeric GCF
-      const includeX = coin(rand); // common x factor?
-      const a = g * randint(rand,1,6);
-      const b = g * randint(rand,1,6) * (coin(rand)?1:-1);
-      const c = g * randint(rand,1,6) * (coin(rand)?1:-1);
-      const pow = includeX ? randint(rand,1,2) : 0; // x or x^2 common
-      // Build terms respecting x power
-      // We'll make: g*x^pow * (A x^{2-pow} + B x^{1-pow} + C x^{-pow}) but ensure nonnegative exponents
+      const g = randint(rand,2,9);
+      const includeX = coin(rand);
+      const pow = includeX ? randint(rand,1,2) : 0; // common x or x^2
       let A=randint(rand,1,6), B=randint(rand,1,8), C=randint(rand,1,9);
       if(coin(rand)) B*=-1; if(coin(rand)) C*=-1;
-      const inside = [A, (pow<=1?B:0), (pow===0?C:(pow===1?C:0))];
-      // If pow=2, we only keep ax^2 + c to avoid negative exponents
       const poly = [g*A, (pow<=1? g*B : 0), (pow===0? g*C : 0)];
-      const factor = g + (pow>0? 'x' + (pow===1?'':'^{'+pow+'}') : '');
-      const insideTex = texPoly(inside);
-      const q = `Factor: \(${texPoly(poly)}\)`;
-      const aTex = `\(${factor}\left(${insideTex}\right)\)`;
-      const steps = [
-        `Find the GCF: numeric \(${g}\)` + (pow>0? ` and variable \(x^{${pow}}\)` : ''),
-        `Factor out the GCF: \(${factor}\)`,
-        `Remaining trinomial: \(${insideTex}\)`
-      ];
-      return { type:'GCF', question:q, answer:aTex, steps };
+      const factorStr = g + (pow>0? `x${pow===1? '': `^${pow}`}` : '');
+      const inside = [A, (pow<=1?B:0), (pow===0?C:(pow===1?C:0))];
+      const insideHTML = polyToHTML(inside[2], inside[1], inside[0]); // careful order
+      const sampleFactored = `${factorStr}(${insideHTML.replace(/<sup>/g,'^').replace(/<\/sup>/g,'')})`;
+      return { kind:'GCF', coeffs:[poly[2], poly[1], poly[0]], factored: sampleFactored };
     }
 
     function genDiffSquares(rand){
-      // a^2 x^2 - b^2
       const a = randint(rand,2,12);
       const b = randint(rand,2,12);
-      const q = `Factor: \(${a*a}x^{2} - ${b*b}\)`;
-      const aTex = `\((${a}x - ${b})(${a}x + ${b})\)`;
-      const steps = [
-        `Recognize difference of squares: \(A^2 - B^2 = (A-B)(A+B)\)`,
-        `Here, \(A=${a}x\) and \(B=${b}\)`
-      ];
-      return { type:'Difference of Squares', question:q, answer:aTex, steps };
+      const A=a*a, C=-(b*b);
+      return { kind:'DOS', coeffs:[C, 0, A], factored: `(${a}x - ${b})(${a}x + ${b})` };
     }
 
     function genTrinomialA1(rand){
-      // x^2 + bx + c, factorable
       const m = randint(rand,1,12) * (coin(rand)?1:-1);
       const n = randint(rand,1,12) * (coin(rand)?1:-1);
       const b = m + n; const c = m * n;
-      const q = `Factor: \(x^{2} ${b>=0?'+':''}${b}x ${c>=0?'+':''}${c}\)`;
-      const aTex = `\((x ${m>=0?'+':''}${m})(x ${n>=0?'+':''}${n})\)`;
-      const steps = [
-        `Find two integers that multiply to \(c=${c}\) and add to \(b=${b}\): \(${m}\) and \(${n}\)`
-      ];
-      return { type:'Trinomial (a=1)', question:q, answer:aTex, steps };
+      return { kind:'A1', coeffs:[c, b, 1], factored: `(x ${m>=0?'+':''}${m})(x ${n>=0?'+':''}${n})` };
     }
 
     function genTrinomialAGt1(rand){
-      // (px + r)(qx + s)
-      const p = randint(rand,2,6);
-      const q = randint(rand,2,6);
+      const p = randint(rand,2,6), q = randint(rand,2,6);
       const r = randint(rand,1,10) * (coin(rand)?1:-1);
       const s = randint(rand,1,10) * (coin(rand)?1:-1);
-      const a = p*q; const b = p*s + q*r; const c = r*s;
-      const qtex = `Factor: \\(${texPoly([a,b,c])}\\)`;
-      const atex = `\\((${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})\\)`;
-      const steps = [
-        `Use grouping or the AC method (here built from factors):`,
-        `We constructed it from \((${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})\)`
-      ];
-      return { type:'Trinomial (a>1)', question:qtex, answer:atex, steps };
+      const a = p*q, b = p*s + q*r, c = r*s;
+      return { kind:'Agt1', coeffs:[c,b,a], factored: `(${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})` };
     }
 
-    // ---------- Render & State ----------
+    // ======= Deterministic set =======
+    function chicagoISO(d=new Date()){
+      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Chicago', year:'numeric', month:'2-digit', day:'2-digit' });
+      const parts = fmt.formatToParts(d); const y=parts.find(p=>p.type==='year').value; const m=parts.find(p=>p.type==='month').value; const da=parts.find(p=>p.type==='day').value; return `${y}-${m}-${da}`;
+    }
+
+    function readParams(){ const sp = new URLSearchParams(location.search); const d=sp.get('d'); const k=sp.get('k'); if(d) dateEl.value = d; else dateEl.value = chicagoISO(); if(k) seedEl.value = k; }
+    function currentSeed(){ const d = dateEl.value || chicagoISO(); const k = seedEl.value.trim(); return `${d}::${k}`; }
+
+    // ======= Polynomial helpers for checking =======
+    function polyAdd(a,b){ return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
+    function polyMul(a,b){ return [ a[0]*b[0], a[0]*b[1]+a[1]*b[0], a[0]*b[2]+a[1]*b[1]+a[2]*b[0] ]; }
+    function polyEqualUpToScalar(s, t){
+      const eps=1e-9; const idx = t[2]!==0?2:(t[1]!==0?1:0); if(t[idx]===0) return Math.abs(s[0])<eps && Math.abs(s[1])<eps && Math.abs(s[2])<eps; const k = s[idx]/t[idx]; if(Math.abs(k)<eps) return false; return Math.abs(s[0]-k*t[0])<1e-6 && Math.abs(s[1]-k*t[1])<1e-6 && Math.abs(s[2]-k*t[2])<1e-6; }
+
+    // Parse expression like (2x-3)(x+4) or -2(x+1)(x-5). No variables other than x; degrees up to 2.
+    function expandExpression(expr){
+      if(!expr) return null;
+      let s = expr.replace(/\s+/g,'');
+      // implied multiplication: 2(x+1) -> 2*(x+1); x(x+1) -> x*(x+1); )( -> )*(
+      s = s.replace(/([0-9x])\(/g, '$1*(').replace(/\)\(/g, ')*(').replace(/\)([0-9x])/g, ')*$1');
+      // split top-level by *
+      const factors = splitTopLevel(s,'*');
+      if(factors.length===0) return null;
+      let poly = [1,0,0];
+      for(const f of factors){ const pf = parseFactor(f); if(!pf) return null; poly = polyMul(poly, pf); }
+      return { poly, factorCount: factors.length };
+    }
+
+    function splitTopLevel(s, sep){
+      const out=[]; let depth=0; let start=0; for(let i=0;i<s.length;i++){ const c=s[i]; if(c==='(') depth++; else if(c===')') depth--; else if(c===sep && depth===0){ out.push(s.slice(start,i)); start=i+1; } } out.push(s.slice(start)); return out.filter(Boolean);
+    }
+
+    function parseFactor(f){ // either (sum) or a single term/sum
+      if(f[0]==='(' && f[f.length-1]===')') return parseSum(f.slice(1,-1));
+      return parseSum(f);
+    }
+
+    function parseSum(s){
+      const terms = s.match(/[+-]?[^+-]+/g);
+      if(!terms) return null;
+      let poly=[0,0,0];
+      for(const t of terms){ const pt = parseTerm(t); if(!pt) return null; poly = polyAdd(poly, pt); }
+      return poly;
+    }
+
+    function parseTerm(t){ // forms: ax^2, bx, c
+      if(!t) return null;
+      let coef=0, pow=0;
+      if(t.includes('x')){
+        const [left, ...right] = t.split('x');
+        const before = left; // may be '', '-', '3', '+4'
+        if(before==='' || before==='+') coef=1; else if(before==='-') coef=-1; else coef=parseFloat(before);
+        pow = 1;
+        if(right.length>0){ const rest = right.join('x'); if(rest.startsWith('^')){ const p = parseInt(rest.slice(1),10); pow = isNaN(p)?1:p; } }
+      } else { coef = parseFloat(t); pow = 0; }
+      if(isNaN(coef)) return null; if(pow<0 || pow>2) return null;
+      const arr=[0,0,0]; arr[pow]=coef; return arr;
+    }
+
+    // ======= Rendering and Checking =======
     const problemsEl = document.getElementById('problems');
     const dateEl = document.getElementById('date');
     const seedEl = document.getElementById('seed');
+    const sidEl = document.getElementById('sid');
+    const hashIdEl = document.getElementById('hashId');
     const btnRegen = document.getElementById('regen');
     const btnReveal = document.getElementById('reveal');
-    const btnCopy = document.getElementById('copyLaTeX');
-    const btnPrint = document.getElementById('printBtn');
-
-    function chicagoISO(d=new Date()){
-      // Convert to America/Chicago local date string YYYY-MM-DD
-      const fmt = new Intl.DateTimeFormat('en-CA', { timeZone:'America/Chicago', year:'numeric', month:'2-digit', day:'2-digit' });
-      const parts = fmt.formatToParts(d); // e.g., 2025-09-10
-      const y = parts.find(p=>p.type==='year').value;
-      const m = parts.find(p=>p.type==='month').value;
-      const da = parts.find(p=>p.type==='day').value;
-      return `${y}-${m}-${da}`;
-    }
-
-    function readParams(){
-      const sp = new URLSearchParams(location.search);
-      const d = sp.get('d');
-      const k = sp.get('k');
-      if(d) dateEl.value = d; else dateEl.value = chicagoISO();
-      if(k) seedEl.value = k;
-    }
-
-    function currentSeed(){
-      const d = dateEl.value || chicagoISO();
-      const k = seedEl.value.trim();
-      return `${d}::${k}`;
-    }
+    const btnCheck = document.getElementById('checkBtn');
+    const btnSubmit = document.getElementById('submitBtn');
+    const scoreEl = document.getElementById('score');
 
     function generate(){
       const rand = seededRand(currentSeed());
       const gens = [genGCF, genDiffSquares, genTrinomialA1, genTrinomialAGt1];
       const set = gens.map(fn => fn(rand));
+      shuffle(rand,set);
       renderSet(set);
       const url = new URL(location.href);
       url.searchParams.set('d', dateEl.value || chicagoISO());
@@ -273,49 +254,90 @@
       history.replaceState({}, '', url);
     }
 
-    function cardHTML(idx, p){
-      return `
-        <article class="card" data-idx="${idx}">
-          <h3>${idx+1}. ${p.type}</h3>
-          <div class="problem">$${p.question}$</div>
-          <details>
-            <summary>Show solution</summary>
-            <div class="meta" style="margin-top:6px">Answer: <span>$${p.answer}$</span></div>
-            <ol class="meta" style="margin-top:6px">
-              ${p.steps.map(s=>`<li>${s.replace(/\$/g,'\\$')}</li>`).join('')}
-            </ol>
-          </details>
-        </article>`;
-    }
-
     function renderSet(set){
-      problemsEl.innerHTML = set.map((p,i)=>cardHTML(i,p)).join('');
-      if(window.MathJax) MathJax.typesetPromise?.();
+      problemsEl.innerHTML = set.map((p,i)=>{
+        const [c0,c1,c2] = p.coeffs; // [constant, x, x^2]
+        const html = polyToHTML(c2,c1,c0);
+        return `
+          <article class="card" data-idx="${i}">
+            <h3>Problem ${i+1}</h3>
+            <div class="problem">Factor: <strong>${html}</strong></div>
+            <div class="row" style="margin-top:8px">
+              <label class="meta">Your answer (use parentheses, e.g., (x+3)(2x-5))</label>
+              <input class="answer" id="ans-${i}" type="text" placeholder="e.g., (x+3)(x+4) or -1(x-2)(x-3)" />
+            </div>
+            <div class="meta" id="msg-${i}" style="min-height:22px; margin-top:6px"></div>
+            <details>
+              <summary>Show a sample solution</summary>
+              <div class="meta" style="margin-top:6px">One factored form: <strong>${p.factored}</strong></div>
+            </details>
+          </article>`;
+      }).join('');
       window.__currentSet = set;
+      scoreEl.textContent = '';
+      btnSubmit.disabled = true;
     }
 
-    function revealAll(){
-      document.querySelectorAll('#problems details').forEach(d => d.open = true);
-    }
-
-    function copyLaTeX(){
+    function checkAnswers(){
       if(!window.__currentSet) return;
-      const lines = window.__currentSet.map((p,i)=>`${i+1}. ${p.question}`);
-      const tex = lines.join('\n\n');
-      navigator.clipboard.writeText(tex).then(()=>{
-        btnCopy.textContent = 'Copied!';
-        setTimeout(()=>btnCopy.textContent='Copy Problems (LaTeX)', 1500);
-      });
+      const set = window.__currentSet;
+      let correct=0;
+      for(let i=0;i<set.length;i++){
+        const target = set[i].coeffs; // [c0,c1,c2]
+        const inp = document.getElementById(`ans-${i}`).value.trim();
+        const msg = document.getElementById(`msg-${i}`);
+        if(!inp){ msg.innerHTML = '<span class="warn">Enter an answer.</span>'; continue; }
+        const expanded = expandExpression(inp);
+        if(!expanded){ msg.innerHTML = '<span class="err">Could not parse. Use forms like (x+3)(2x-1) with parentheses.</span>'; continue; }
+        const okFactorCount = expanded.factorCount >= 2; // discourage copying original
+        const equal = polyEqualUpToScalar(expanded.poly, [target[0],target[1],target[2]]);
+        if(equal && okFactorCount){ msg.innerHTML = '<span class="ok">Correct ✔</span>'; correct++; }
+        else if(equal && !okFactorCount){ msg.innerHTML = '<span class="warn">Expression matches original but is not factored (need at least two factors).</span>'; }
+        else { msg.innerHTML = '<span class="err">Not correct. Try checking signs and factor order.</span>'; }
+      }
+      scoreEl.textContent = `Score: ${correct}/${set.length}`;
+      btnSubmit.disabled = false;
+      return correct;
     }
 
-    // Init
+    async function sha256Hex(str){
+      const buf = new TextEncoder().encode(str);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      const arr = Array.from(new Uint8Array(hash));
+      return arr.map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+
+    async function submitResults(){
+      if(!SCRIPT_URL){ alert('Submission endpoint not set. Ask your teacher.'); return; }
+      const set = window.__currentSet; if(!set) return;
+      const date = dateEl.value || chicagoISO();
+      const seed = seedEl.value.trim();
+      let sid = sidEl.value.trim();
+      if(!sid){ alert('Enter student number.'); return; }
+      const idToSend = hashIdEl.checked ? await sha256Hex(sid) : sid;
+      const answers = [];
+      for(let i=0;i<set.length;i++){
+        const raw = document.getElementById(`ans-${i}`).value.trim();
+        const exp = expandExpression(raw);
+        const ok = !!exp && polyEqualUpToScalar(exp.poly, [set[i].coeffs[0], set[i].coeffs[1], set[i].coeffs[2]]) && exp.factorCount>=2;
+        answers.push({ raw, correct: ok });
+      }
+      const payload = { date, seed, studentId: idToSend, hashed: hashIdEl.checked, score: answers.filter(a=>a.correct).length, total: answers.length, answers, problems: set.map(p=>({ coeffs:p.coeffs })) };
+      try{
+        const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+        if(!res.ok){ throw new Error('HTTP '+res.status); }
+        scoreEl.textContent = 'Submitted!';
+      }catch(e){ alert('Submit failed: '+e.message); }
+    }
+
+    // ======= Init =======
     readParams();
     generate();
 
     btnRegen.addEventListener('click', generate);
-    btnReveal.addEventListener('click', revealAll);
-    btnCopy.addEventListener('click', copyLaTeX);
-    btnPrint.addEventListener('click', ()=>window.print());
+    btnReveal.addEventListener('click', ()=>{ document.querySelectorAll('#problems details').forEach(d=>d.open=true); });
+    btnCheck.addEventListener('click', checkAnswers);
+    btnSubmit.addEventListener('click', submitResults);
   </script>
 </body>
 </html>
