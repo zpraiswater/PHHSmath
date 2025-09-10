@@ -93,7 +93,7 @@
 
   <script>
     // ======= CONFIG: paste your Apps Script web app URL here to enable submissions =======
-    const SCRIPT_URL = ""; // e.g., https://script.google.com/macros/s/AKfycb.../exec
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXBXnWc5GiOu2DkxGiLQDP_vXfLMmWG4lVBUHUN_kRBfXU840qk0xxWyhlqVS8mBtr/exec"; // e.g., https://script.google.com/macros/s/AKfycb.../exec
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
@@ -211,7 +211,7 @@
     const sidEl = document.getElementById('sid');
     const hashIdEl = document.getElementById('hashId');
     const btnRegen = document.getElementById('regen');
-    
+    const btnReveal = document.getElementById('reveal');
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
     const scoreEl = document.getElementById('score');
