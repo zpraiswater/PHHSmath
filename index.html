@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PHHS Daily Factoring Review</title>
-  <meta name="description" content="Daily factoring practice: enter S-number, answer, check, and (optionally) submit results to a Google Sheet. No external CDNs required." />
+  <meta name="description" content="Daily factoring practice: enter S-number, answer, check, and (optionally) submit results to a Google Sheet." />
   <style>
     :root{
       --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
@@ -93,7 +93,7 @@
 
   <script>
     // ======= CONFIG: paste your Apps Script web app URL here to enable submissions =======
-    const SCRIPT_URL = ""; // e.g., https://script.google.com/macros/s/AKfycb.../exec
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzVW_TZMosiIDCAsSiuNBXYMNw2DXS4GKcp9KegBGBWktkWKtreXQgO4vK5MIHaucxe/exec"; // e.g., https://script.google.com/macros/s/AKfycb.../exec
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
