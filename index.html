@@ -3,29 +3,33 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PHHS Daily Factoring Review (No-CDN, Answer Checker)</title>
-  <meta name="description" content="Generates 4 factoring problems of different types each day with solutions — no MathJax required. Includes student answer inputs, checker, and optional submission to a Google Sheet via Apps Script." />
+  <title>PHHS Daily Factoring Review</title>
+  <meta name="description" content="Daily factoring practice: enter S-number, answer, check, and (optionally) submit results to a Google Sheet. No external CDNs required." />
   <style>
     :root{
-      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#38c172; --warn:#f9ac3d; --err:#ef6666;
+      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
       --border:#22305e; --input-bg:#f6f8ff; --input-text:#0c1230; --input-bd:#9bb3e3;
+      --btn-submit:#8fe0bf; --btn-submit-hover:#7ad7b2; --btn-submit-text:#053826;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
     body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #15224d 0%, var(--bg) 60%); color:var(--ink)}
     header{padding:24px 20px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
     h1{margin:0; font-size:clamp(1.2rem,2.2vw + .6rem,2rem); letter-spacing:.3px}
+    .tag{font-size:.9rem; color:#d9e4ff}
     main{max-width:1100px; margin:0 auto; padding:0 16px 48px}
     .panel{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
     .controls{display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:12px; align-items:end}
     .controls .col{display:flex; flex-direction:column; gap:6px}
-    label{font-size:.8rem; color:var(--muted)}
+    label{font-size:.85rem; color:var(--muted)}
     input[type="date"], input[type="text"], input.answer{height:40px; border:1px solid var(--input-bd); border-radius:10px; background:var(--input-bg); color:var(--input-text); padding:0 12px}
     input.answer::placeholder{color:#6b75a1}
     input:focus{outline:none; box-shadow:0 0 0 3px rgba(106,166,255,.35)}
     button{height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#13204d; color:var(--ink); font-weight:600; cursor:pointer}
     button:hover{background:#192a63}
     .btn-primary{background:linear-gradient(180deg,#2b56cc,#2348ac); border-color:#2b56cc}
+    .btn-submit{background:var(--btn-submit); color:var(--btn-submit-text); border-color:var(--btn-submit-hover);}
+    .btn-submit:hover{background:var(--btn-submit-hover)}
     .grid{display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:16px; margin-top:16px}
     .card{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:14px; padding:16px}
     .card h3{margin:2px 0 12px; font-size:1rem; color:#cdd7ff; letter-spacing:.3px}
@@ -44,7 +48,7 @@
   <header>
     <div>
       <h1>PHHS Daily Factoring Review</h1>
-      <div class="footnote">No MathJax • Deterministic by date • Answer checker • Optional submit to Google Sheet</div>
+      <div class="tag">Enter S number – Answer questions – Check Answers – Submit Results</div>
     </div>
   </header>
 
@@ -56,8 +60,8 @@
           <input id="date" type="date" />
         </div>
         <div class="col">
-          <label for="sid">Student Number</label>
-          <input id="sid" type="text" placeholder="e.g., 123456" />
+          <label for="sid">Student Number (S-number)</label>
+          <input id="sid" type="text" placeholder="e.g., S123456" />
         </div>
         <div class="col">
           <label>&nbsp;</label>
@@ -69,7 +73,7 @@
         </div>
         <div class="col">
           <label>&nbsp;</label>
-          <button id="reveal">Reveal All Solutions</button>
+          <button id="reveal">Reveal Attempted Solutions</button>
         </div>
         <div class="col">
           <label>&nbsp;</label>
@@ -80,7 +84,7 @@
       <div class="grid" id="problems"></div>
       <div class="row" style="margin-top:12px">
         <button id="checkBtn" class="btn-primary">Check Answers</button>
-        <button id="submitBtn" disabled>Submit Results</button>
+        <button id="submitBtn" class="btn-submit" disabled>Submit Results</button>
         <span id="score" class="status"></span>
       </div>
       <div class="footnote" style="margin-top:8px">Same date ⇒ same set. URL can include <code>?d=YYYY-MM-DD</code> to lock a given day.</div>
@@ -120,19 +124,22 @@
     // ======= GCD helpers =======
     function igcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ const t=b; b=a%b; a=t; } return a||0; }
     function polyGcdCoef([c0,c1,c2]){ const arr=[Math.abs(c0),Math.abs(c1),Math.abs(c2)].filter(v=>v!==0); if(arr.length===0) return 0; return arr.reduce((g,v)=>igcd(g,v)); }
-    function polyGcdVarPow([c0,c1,c2]){ if(c0!==0) return 0; if(c1!==0) return 1; if(c2!==0) return 2; return 0; }
+    function polyGcdVarPow([c0,c1,c2]){ // minimum power of x across nonzero terms
+      if(c0!==0) return 0; // has constant term
+      if(c1!==0) return 1; // all terms have at least one x
+      if(c2!==0) return 2; // only x^2 term present (we avoid monomials elsewhere)
+      return 0;
+    }
 
-    // ======= Problem Generators (hidden types to students) =======
+    // ======= Problem Generators (order hidden to students) =======
     function genGCF(rand){
       const g = randint(rand,2,9); // numeric GCF
-      const pow = coin(rand) ? 1 : 0; // avoid pow=2 to prevent monomial only
+      const pow = coin(rand) ? 1 : 0; // allow common x but not x^2-only
       let A=randint(rand,1,6), B=randint(rand,1,8), C=randint(rand,1,9);
       if(coin(rand)) B*=-1; if(coin(rand)) C*=-1;
       const poly = [ g*A, (pow<=1? g*B : 0), (pow===0? g*C : 0) ];
-      // ensure at least two non-zero terms
-      if((poly[0]===0)+(poly[1]===0)+(poly[2]===0) > 1) return genGCF(rand);
-      const factorStr = g + (pow>0? `x${pow===1?'':`^${pow}`}` : '');
-      const sample = `${factorStr}(${polyToHTML(poly[2]/(pow?1:1), poly[1]/g, poly[0]/g)})`;
+      if((poly[0]===0)+(poly[1]===0)+(poly[2]===0) > 1) return genGCF(rand); // avoid monomials/binomials with one term
+      const sample = `(${g}${pow>0?`x${pow===1?'':`^${pow}`}`:''})(${polyToHTML(poly[2]/(pow?1:1), poly[1]/g, poly[0]/g)})`;
       return makeProblem(poly, sample);
     }
 
@@ -208,8 +215,9 @@
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
     const scoreEl = document.getElementById('score');
+    let hasChecked = false;
 
-    function currentSeed(){ return dateEl.value || chicagoISO(); }
+    function currentSeed(){ return (dateEl.value || chicagoISO()); }
 
     function generate(){
       const rand = seededRand(currentSeed());
@@ -218,6 +226,7 @@
       shuffle(rand,set);
       renderSet(set);
       const url = new URL(location.href); url.searchParams.set('d', dateEl.value || chicagoISO()); history.replaceState({}, '', url);
+      hasChecked = false;
     }
 
     function renderSet(set){
@@ -233,8 +242,8 @@
               <input class="answer" id="ans-${i}" type="text" placeholder="e.g., (x+3)(x+4) or -1(x-2)(x-3)" />
             </div>
             <div class="meta" id="msg-${i}" style="min-height:22px; margin-top:6px"></div>
-            <details>
-              <summary>Show a sample solution</summary>
+            <details id="sol-${i}" class="solution" style="display:none">
+              <summary>Show solution</summary>
               <div class="meta" style="margin-top:6px">One factored form: <strong>${p.sample}</strong></div>
             </details>
           </article>`;
@@ -255,37 +264,46 @@
       for(let i=0;i<set.length;i++){
         const target = set[i].coeffs; // [c0,c1,c2]
         const gCoef = set[i].gCoef, gPow = set[i].gPow;
-        const inp = document.getElementById(`ans-${i}`).value.trim();
+        const inpEl = document.getElementById(`ans-${i}`);
+        const inp = inpEl.value.trim();
         const msg = document.getElementById(`msg-${i}`);
-        if(!inp){ msg.innerHTML = '<span class="warn">Enter an answer.</span>'; continue; }
+        const sol = document.getElementById(`sol-${i}`);
+
+        if(!inp){
+          msg.innerHTML = '<span class="warn">Enter an answer.</span>';
+          sol.style.display = 'none';
+          continue;
+        }
+
         const parsed = expandExpression(inp);
-        if(!parsed){ msg.innerHTML = '<span class="err">Could not parse. Use forms like (x+3)(2x-1) with parentheses.</span>'; continue; }
+        if(!parsed){ msg.innerHTML = '<span class="err">Could not parse. Use forms like (x+3)(2x-1) with parentheses.</span>'; sol.style.display='block'; inpEl.disabled = true; continue; }
         if(!polyEqual(parsed.poly, [target[0],target[1],target[2]])){
-          msg.innerHTML = '<span class="err">Does not expand to the original polynomial.</span>'; continue;
+          msg.innerHTML = '<span class="err">Does not expand to the original polynomial.</span>';
+          sol.style.display = 'block';
+          inpEl.disabled = true;
+          continue;
         }
-        if(parsed.factorPolys.length < 2){ msg.innerHTML = '<span class="warn">Not factored. Provide it as a product of factors.</span>'; continue; }
-        let mon=[1,0,0];
-        for(const f of parsed.factorPolys){ if(isMonomial(f)) mon = multiplyMonomials(mon,f); }
-        const {coef:monC,pow:monP} = monomialCoefPow(mon);
-        const monAbs = Math.abs(monC);
-        if(gCoef>1 || gPow>0){
-          if(!(monAbs===gCoef && monP===gPow)){
-            msg.innerHTML = `<span class="err">Factor out the GCF first: expected <strong>${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''}</strong> as an outside monomial factor.</span>`;
-            continue;
-          }
-        }
+        if(parsed.factorPolys.length < 2){ msg.innerHTML = '<span class="warn">Not factored. Provide it as a product of factors.</span>'; sol.style.display='block'; inpEl.disabled=true; continue; }
+
+        let mon=[1,0,0]; for(const f of parsed.factorPolys){ if(isMonomial(f)) mon = multiplyMonomials(mon,f); }
+        const {coef:monC,pow:monP} = monomialCoefPow(mon); const monAbs=Math.abs(monC);
+        if(gCoef>1 || gPow>0){ if(!(monAbs===gCoef && monP===gPow)){ msg.innerHTML = `<span class=\"err\">Factor out the GCF first: expected <strong>${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''}</strong> outside.</span>`; sol.style.display='block'; inpEl.disabled=true; continue; } }
+
         msg.innerHTML = '<span class="ok">Correct ✔</span>';
+        sol.style.display = 'block';
+        inpEl.disabled = true;
         correct++;
       }
       scoreEl.textContent = `Score: ${correct}/${set.length}`;
       btnSubmit.disabled = false;
+      hasChecked = true;
       return correct;
     }
 
     async function sha256Hex(str){ const buf=new TextEncoder().encode(str); const hash=await crypto.subtle.digest('SHA-256',buf); const arr=Array.from(new Uint8Array(hash)); return arr.map(b=>b.toString(16).padStart(2,'0')).join(''); }
 
     async function submitResults(){
-      if(!SCRIPT_URL){ alert('Submission endpoint not set.'); return; }
+      if(!SCRIPT_URL){ alert('Submission endpoint not set. Ask your teacher.'); return; }
       const set = window.__currentSet; if(!set) return;
       const date = dateEl.value || chicagoISO();
       let sid = sidEl.value.trim(); if(!sid){ alert('Enter student number.'); return; }
@@ -293,7 +311,7 @@
       const answers = [];
       for(let i=0;i<set.length;i++){
         const raw = document.getElementById(`ans-${i}`).value.trim();
-        const parsed = expandExpression(raw);
+        const parsed = raw? expandExpression(raw) : null;
         const ok = !!parsed && polyEqual(parsed.poly, [set[i].coeffs[0], set[i].coeffs[1], set[i].coeffs[2]]) && parsed.factorPolys.length>=2;
         let mon=[1,0,0]; if(parsed){ for(const f of parsed.factorPolys){ if(isMonomial(f)) mon= multiplyMonomials(mon,f); } }
         const {coef:monC,pow:monP} = monomialCoefPow(mon);
@@ -304,14 +322,22 @@
       try{ const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); if(!res.ok) throw new Error('HTTP '+res.status); scoreEl.textContent = 'Submitted!'; }catch(e){ alert('Submit failed: '+e.message); }
     }
 
-    // ======= Init =======
-    readParams();
-    generate();
+    // ======= Init & Events =======
+    function chicagoOnLoad(){ readParams(); generate(); }
+    chicagoOnLoad();
+
     btnRegen.addEventListener('click', generate);
-    btnReveal.addEventListener('click', ()=>{ document.querySelectorAll('#problems details').forEach(d=>d.open=true); });
+    btnReveal.addEventListener('click', ()=>{
+      if(!hasChecked){ alert('Check answers first. Solutions appear only for attempted problems.'); return; }
+      (window.__currentSet||[]).forEach((_,i)=>{
+        const val = document.getElementById(`ans-${i}`).value.trim();
+        const det = document.getElementById(`sol-${i}`);
+        if(val){ det.style.display='block'; det.open = true; }
+      });
+    });
+    document.getElementById('printBtn').addEventListener('click', ()=>window.print());
     btnCheck.addEventListener('click', checkAnswers);
     btnSubmit.addEventListener('click', submitResults);
-    document.getElementById('printBtn').addEventListener('click', ()=>window.print());
   </script>
 </body>
 </html>
