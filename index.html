@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PHHS Daily Factoring Review</title>
-  <meta name="description" content="Daily factoring practice: enter S-number, answer, check, and (optionally) submit results to a Google Sheet. No external CDNs required." />
+  <meta name="description" content="Enter S-number, answer four factoring questions, check answers, and submit results directly to a Google Form (no second click)." />
   <style>
     :root{
       --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
@@ -65,10 +65,6 @@
         </div>
         <div class="col">
           <label>&nbsp;</label>
-          <label class="row" style="gap:8px; font-size:.9rem"><input type="checkbox" id="hashId"> Hash ID before submit</label>
-        </div>
-        <div class="col">
-          <label>&nbsp;</label>
           <button id="regen" class="btn-primary">Generate Set</button>
         </div>
         <div class="col">
@@ -88,21 +84,17 @@
   </main>
 
   <script>
-    // === Google Form prefill config (Step 3) ===
-const FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScMe4NY3BsH62BFW4674lgkQ1f5thwKuvdLQ52R0Zs7I-KrHQ/viewform?usp=pp_url"; // from your prefilled link
+    // === DIRECT-TO-GOOGLE-FORM (no second click) ===
+    // Form URL example: https://docs.google.com/forms/d/e/FORM_ID/viewform
+    const FORM_ID = "1FAIpQLScMe4NY3BsH62BFW4674lgkQ1f5thwKuvdLQ52R0Zs7I-KrHQ"; // your form ID
     const ENTRY = {
-  date:     "entry.410399227", // replace with your entry IDs
-  sid:      "entry.1818636007",
-  score:    "entry.630397787",
-  total:    "entry.1486885887",
-  problems: "entry.1525540760",
-  answers:  "entry.726459644"
-};
-function addParam(url, key, value){
-  const v = encodeURIComponent(String(value ?? ""));
-  return `${url}&${key}=${v}`;
-}
-
+      date:     "entry.410399227",
+      sid:      "entry.1818636007",
+      score:    "entry.630397787",
+      total:    "entry.1486885887",
+      problems: "entry.1525540760",
+      answers:  "entry.726459644"
+    };
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
@@ -213,7 +205,6 @@ function addParam(url, key, value){
     const problemsEl = document.getElementById('problems');
     const dateEl = document.getElementById('date');
     const sidEl = document.getElementById('sid');
-    const hashIdEl = document.getElementById('hashId');
     const btnRegen = document.getElementById('regen');
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
@@ -300,61 +291,47 @@ function addParam(url, key, value){
       return correct;
     }
 
-    async function sha256Hex(str){ const buf=new TextEncoder().encode(str); const hash=await crypto.subtle.digest('SHA-256',buf); const arr=Array.from(new Uint8Array(hash)); return arr.map(b=>b.toString(16).padStart(2,'0')).join(''); }
+    function submitViaFormDirect(){
+      const date = document.getElementById('date')?.value || "";
+      const sid  = (document.getElementById('sid')?.value || "").trim();
+      const set  = window.__currentSet || [];
 
-    async function submitResults(){
-      if(!SCRIPT_URL){ alert('Submission endpoint not set. Ask your teacher.'); return; }
-      const set = window.__currentSet; if(!set) return;
-      const date = dateEl.value || chicagoISO();
-      let sid = sidEl.value.trim(); if(!sid){ alert('Enter student number.'); return; }
-      const idToSend = hashIdEl.checked ? await sha256Hex(sid) : sid;
-      const answers = [];
-      for(let i=0;i<set.length;i++){
-        const raw = document.getElementById(`ans-${i}`).value.trim();
-        const parsed = raw? expandExpression(raw) : null;
-        const ok = !!parsed && polyEqual(parsed.poly, [set[i].coeffs[0], set[i].coeffs[1], set[i].coeffs[2]]) && parsed.factorPolys.length>=2;
-        let mon=[1,0,0]; if(parsed){ for(const f of parsed.factorPolys){ if(isMonomial(f)) mon= multiplyMonomials(mon,f); } }
-        const {coef:monC,pow:monP} = monomialCoefPow(mon);
-        const pulledGCF = (Math.abs(monC)===set[i].gCoef && monP===set[i].gPow);
-        answers.push({ raw, correct: ok && (set[i].gCoef<=1 && set[i].gPow===0 ? true : pulledGCF), pulledGCF });
-      }
-      const payload = { date, studentId:idToSend, hashed:hashIdEl.checked, score: answers.filter(a=>a.correct).length, total: answers.length, answers, problems: set.map(p=>({ coeffs:p.coeffs, gCoef:p.gCoef, gPow:p.gPow })) };
-      try{ const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); if(!res.ok) throw new Error('HTTP '+res.status); scoreEl.textContent = 'Submitted!'; }catch(e){ alert('Submit failed: '+e.message); }
+      const scoreMatch = (document.getElementById('score')?.textContent || "").match(/Score:\s*(\d+)/);
+      const score = scoreMatch ? Number(scoreMatch[1]) : "";
+
+      const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.type || null }));
+      const answers  = set.map((_, i) => ({ raw: document.getElementById(`ans-${i}`)?.value || "" }));
+
+      const action = `https://docs.google.com/forms/d/e/${FORM_ID}/formResponse`;
+      const params = new URLSearchParams();
+      params.set(ENTRY.date,     date);
+      params.set(ENTRY.sid,      sid);
+      params.set(ENTRY.score,    score);
+      params.set(ENTRY.total,    set.length);
+      params.set(ENTRY.problems, JSON.stringify(problems));
+      params.set(ENTRY.answers,  JSON.stringify(answers));
+      params.set('fvv', '1');
+      params.set('submit', 'Submit');
+
+      // Fire-and-forget POST (opaque response in no-cors)
+      fetch(action, {
+        method: 'POST',
+        mode:   'no-cors',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      });
+
+      alert('Submitted!');
     }
-    
-    function submitViaGoogleForm(){
-  const date = document.getElementById('date')?.value || "";
-  const sid  = (document.getElementById('sid')?.value || "").trim();
-  const set  = window.__currentSet || [];
-
-  // If you don’t have a checker/score yet, leave score empty:
-  const score = "";
-
-  const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.type || null }));
-  // If you don’t have answer inputs yet, send empty answers:
-  const answers  = set.map(() => ({ raw: "" }));
-
-  let url = FORM_BASE;
-  url = addParam(url, ENTRY.date,     date);
-  url = addParam(url, ENTRY.sid,      sid);
-  url = addParam(url, ENTRY.score,    score);
-  url = addParam(url, ENTRY.total,    set.length);
-  url = addParam(url, ENTRY.problems, JSON.stringify(problems));
-  url = addParam(url, ENTRY.answers,  JSON.stringify(answers));
-
-  // Opens the prefilled Form; student clicks Submit in the Form UI
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
     // ======= Init & Events =======
     function chicagoOnLoad(){ readParams(); generate(); }
     chicagoOnLoad();
-    
-    document.getElementById('submitBtn')?.addEventListener('click', submitViaGoogleForm);
+
     btnRegen.addEventListener('click', generate);
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
     btnCheck.addEventListener('click', checkAnswers);
-    btnSubmit.addEventListener('click', submitResults);
+    btnSubmit.addEventListener('click', submitViaFormDirect);
   </script>
 </body>
 </html>
