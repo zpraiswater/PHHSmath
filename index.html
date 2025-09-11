@@ -63,10 +63,7 @@
           <label for="sid">Student Number (S-number)</label>
           <input id="sid" type="text" placeholder="e.g., S123456" />
         </div>
-        <div class="col">
-          <label>&nbsp;</label>
-          <button id="regen" class="btn-primary">Generate Set</button>
-        </div>
+        <!-- Removed the Generate button column -->
         <div class="col">
           <label>&nbsp;</label>
           <button id="printBtn">Print / Save PDF</button>
@@ -136,7 +133,7 @@
       const poly = [ g*A, (pow<=1? g*B : 0), (pow===0? g*C : 0) ];
       if((poly[0]===0)+(poly[1]===0)+(poly[2]===0) > 1) return genGCF(rand); // avoid single-term
       const sample = `(${g}${pow>0?`x${pow===1?'':`^${pow}`}`:''})(${polyToHTML(poly[2]/(pow?1:1), poly[1]/g, poly[0]/g)})`;
-      return makeProblem(poly, sample);
+      return makeProblem(poly, sample, 'GCF');
     }
 
     function genDiffSquares(rand){
@@ -144,7 +141,7 @@
       const A=a*a, C=-(b*b);
       const poly = [C, 0, A];
       const sample = `(${a}x - ${b})(${a}x + ${b})`;
-      return makeProblem(poly, sample);
+      return makeProblem(poly, sample, 'DIFF');
     }
 
     function genTrinomialA1(rand){
@@ -153,7 +150,7 @@
       const b = m + n; const c = m * n;
       const poly = [c, b, 1];
       const sample = `(x ${m>=0?'+':''}${m})(x ${n>=0?'+':''}${n})`;
-      return makeProblem(poly, sample);
+      return makeProblem(poly, sample, 'A1');
     }
 
     function genTrinomialAGt1(rand){
@@ -163,13 +160,13 @@
       const a = p*q, b = p*s + q*r, c = r*s;
       const poly = [c,b,a];
       const sample = `(${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})`;
-      return makeProblem(poly, sample);
+      return makeProblem(poly, sample, 'AGT1');
     }
 
-    function makeProblem(coeffs, sample){
+    function makeProblem(coeffs, sample, kind){
       const gCoef = polyGcdCoef(coeffs);
       const gPow  = polyGcdVarPow(coeffs);
-      return { coeffs, sample, gCoef, gPow };
+      return { coeffs, sample, gCoef, gPow, kind };
     }
 
     // ======= Deterministic set =======
@@ -205,7 +202,6 @@
     const problemsEl = document.getElementById('problems');
     const dateEl = document.getElementById('date');
     const sidEl = document.getElementById('sid');
-    const btnRegen = document.getElementById('regen');
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
     const scoreEl = document.getElementById('score');
@@ -247,6 +243,7 @@
 
     function multiplyMonomials(mon, f){ return polyMul(mon,f); }
     function isMonomial(poly){ return (poly[0]!==0) + (poly[1]!==0) + (poly[2]!==0) === 1; }
+    function degree(poly){ return poly[2]!==0 ? 2 : (poly[1]!==0 ? 1 : (poly[0]!==0 ? 0 : -Infinity)); }
     function monomialCoefPow(poly){ if(poly[2]!==0) return {coef:poly[2], pow:2}; if(poly[1]!==0) return {coef:poly[1], pow:1}; return {coef:poly[0], pow:0}; }
 
     function checkAnswers(){
@@ -256,6 +253,7 @@
       for(let i=0;i<set.length;i++){
         const target = set[i].coeffs; // [c0,c1,c2]
         const gCoef = set[i].gCoef, gPow = set[i].gPow;
+        const kind  = set[i].kind;
         const inpEl = document.getElementById(`ans-${i}`);
         const inp = inpEl.value.trim();
         const msg = document.getElementById(`msg-${i}`);
@@ -275,11 +273,37 @@
           inpEl.disabled = true;
           continue;
         }
-        if(parsed.factorPolys.length < 2){ msg.innerHTML = '<span class="warn">Not factored. Provide it as a product of factors.</span>'; sol.style.display='block'; inpEl.disabled=true; continue; }
 
-        let mon=[1,0,0]; for(const f of parsed.factorPolys){ if(isMonomial(f)) mon = multiplyMonomials(mon,f); }
-        const {coef:monC,pow:monP} = monomialCoefPow(mon); const monAbs=Math.abs(monC);
-        if(gCoef>1 || gPow>0){ if(!(monAbs===gCoef && monP===gPow)){ msg.innerHTML = `<span class=\"err\">Factor out the GCF first: expected <strong>${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''}</strong> outside.</span>`; sol.style.display='block'; inpEl.disabled=true; continue; } }
+        // Count factors after pulling out any monomial GCF from the student's answer
+        let mon=[1,0,0];
+        for(const f of parsed.factorPolys){ if(isMonomial(f)) mon = multiplyMonomials(mon,f); }
+        const {coef:monC,pow:monP} = monomialCoefPow(mon);
+        const monAbs = Math.abs(monC);
+
+        // Enforce required GCF (if any) must be outside
+        if(gCoef>1 || gPow>0){
+          if(!(monAbs===gCoef && monP===gPow)){
+            msg.innerHTML = `<span class="err">Factor out the GCF first: expected <strong>${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''}</strong> outside.</span>`;
+            sol.style.display='block'; inpEl.disabled=true; continue;
+          }
+        }
+
+        // For non-GCF types, require fully factored (no quadratic factor left).
+        if(kind!=='GCF'){
+          const nonMono = parsed.factorPolys.filter(f => !isMonomial(f));
+          const allLinear = nonMono.every(f => degree(f) === 1);
+          if(nonMono.length < 2 || !allLinear){
+            msg.innerHTML = '<span class="err">Fully factor the quadratic into linear factors (no 1·(quadratic)).</span>';
+            sol.style.display='block'; inpEl.disabled=true; continue;
+          }
+        }else{
+          // For GCF-only problems, at least show as a product (GCF)*(something)
+          const hasProduct = parsed.factorPolys.length >= 2;
+          if(!hasProduct){
+            msg.innerHTML = '<span class="err">Write your answer as a product with the GCF factored out.</span>';
+            sol.style.display='block'; inpEl.disabled=true; continue;
+          }
+        }
 
         msg.innerHTML = '<span class="ok">Correct ✔</span>';
         sol.style.display = 'block';
@@ -299,7 +323,7 @@
       const scoreMatch = (document.getElementById('score')?.textContent || "").match(/Score:\s*(\d+)/);
       const score = scoreMatch ? Number(scoreMatch[1]) : "";
 
-      const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.type || null }));
+      const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.kind || null }));
       const answers  = set.map((_, i) => ({ raw: document.getElementById(`ans-${i}`)?.value || "" }));
 
       const action = `https://docs.google.com/forms/d/e/${FORM_ID}/formResponse`;
@@ -313,7 +337,6 @@
       params.set('fvv', '1');
       params.set('submit', 'Submit');
 
-      // Fire-and-forget POST (opaque response in no-cors)
       fetch(action, {
         method: 'POST',
         mode:   'no-cors',
@@ -328,7 +351,9 @@
     function chicagoOnLoad(){ readParams(); generate(); }
     chicagoOnLoad();
 
-    btnRegen.addEventListener('click', generate);
+    // Auto-regenerate when the date changes so students never need a button
+    document.getElementById('date').addEventListener('change', generate);
+
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
     btnCheck.addEventListener('click', checkAnswers);
     btnSubmit.addEventListener('click', submitViaFormDirect);
