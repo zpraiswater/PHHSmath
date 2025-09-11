@@ -88,8 +88,21 @@
   </main>
 
   <script>
-    // ======= CONFIG: paste your Apps Script web app URL here to enable submissions =======
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyXBXnWc5GiOu2DkxGiLQDP_vXfLMmWG4lVBUHUN_kRBfXU840qk0xxWyhlqVS8mBtr/exec"; // e.g., https://script.google.com/macros/s/AKfycb.../exec
+    // === Google Form prefill config (Step 3) ===
+const FORM_BASE = "https://docs.google.com/forms/d/e/1FAIpQLScMe4NY3BsH62BFW4674lgkQ1f5thwKuvdLQ52R0Zs7I-KrHQ/viewform?usp=pp_url"; // from your prefilled link
+    const ENTRY = {
+  date:     "entry.410399227", // replace with your entry IDs
+  sid:      "entry.1818636007",
+  score:    "entry.630397787",
+  total:    "entry.1486885887",
+  problems: "entry.1525540760",
+  answers:  "entry.726459644"
+};
+function addParam(url, key, value){
+  const v = encodeURIComponent(String(value ?? ""));
+  return `${url}&${key}=${v}`;
+}
+
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
@@ -308,11 +321,36 @@
       const payload = { date, studentId:idToSend, hashed:hashIdEl.checked, score: answers.filter(a=>a.correct).length, total: answers.length, answers, problems: set.map(p=>({ coeffs:p.coeffs, gCoef:p.gCoef, gPow:p.gPow })) };
       try{ const res = await fetch(SCRIPT_URL, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) }); if(!res.ok) throw new Error('HTTP '+res.status); scoreEl.textContent = 'Submitted!'; }catch(e){ alert('Submit failed: '+e.message); }
     }
+    
+    function submitViaGoogleForm(){
+  const date = document.getElementById('date')?.value || "";
+  const sid  = (document.getElementById('sid')?.value || "").trim();
+  const set  = window.__currentSet || [];
+
+  // If you don’t have a checker/score yet, leave score empty:
+  const score = "";
+
+  const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.type || null }));
+  // If you don’t have answer inputs yet, send empty answers:
+  const answers  = set.map(() => ({ raw: "" }));
+
+  let url = FORM_BASE;
+  url = addParam(url, ENTRY.date,     date);
+  url = addParam(url, ENTRY.sid,      sid);
+  url = addParam(url, ENTRY.score,    score);
+  url = addParam(url, ENTRY.total,    set.length);
+  url = addParam(url, ENTRY.problems, JSON.stringify(problems));
+  url = addParam(url, ENTRY.answers,  JSON.stringify(answers));
+
+  // Opens the prefilled Form; student clicks Submit in the Form UI
+  window.open(url, "_blank", "noopener,noreferrer");
+}
 
     // ======= Init & Events =======
     function chicagoOnLoad(){ readParams(); generate(); }
     chicagoOnLoad();
-
+    
+    document.getElementById('submitBtn')?.addEventListener('click', submitViaGoogleForm);
     btnRegen.addEventListener('click', generate);
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
     btnCheck.addEventListener('click', checkAnswers);
