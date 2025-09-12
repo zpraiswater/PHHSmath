@@ -123,18 +123,39 @@
     function igcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ const t=b; b=a%b; a=t; } return a||0; }
     function polyGcdCoef([c0,c1,c2]){ const arr=[Math.abs(c0),Math.abs(c1),Math.abs(c2)].filter(v=>v!==0); if(arr.length===0) return 0; return arr.reduce((g,v)=>igcd(g,v)); }
     function polyGcdVarPow([c0,c1,c2]){ if(c0!==0) return 0; if(c1!==0) return 1; if(c2!==0) return 2; return 0; }
+    function divideByScalarAndXPow([c0,c1,c2], gCoef, gPow){
+      // divide by numeric gCoef first
+      let a = c0 / gCoef, b = c1 / gCoef, c = c2 / gCoef; // [const, x, x^2]
+      // then divide by x^gPow by shifting degrees
+      if (gPow === 1) return [b, c, 0];     // (c0,c1,c2)/x -> [x->const, x^2->x]
+      if (gPow === 2) return [c, 0, 0];     // rare, but supported
+      return [a, b, c];                     // gPow === 0
+    }
 
     // ======= Problem Generators (order hidden to students) =======
     function genGCF(rand){
-      const g = randint(rand,2,9); // numeric GCF
-      const pow = coin(rand) ? 1 : 0; // allow common x but not x^2-only
-      let A=randint(rand,1,6), B=randint(rand,1,8), C=randint(rand,1,9);
-      if(coin(rand)) B*=-1; if(coin(rand)) C*=-1;
-      const poly = [ g*A, (pow<=1? g*B : 0), (pow===0? g*C : 0) ];
-      if((poly[0]===0)+(poly[1]===0)+(poly[2]===0) > 1) return genGCF(rand); // avoid single-term
-      const sample = `(${g}${pow>0?`x${pow===1?'':`^${pow}`}`:''})(${polyToHTML(poly[2]/(pow?1:1), poly[1]/g, poly[0]/g)})`;
+      const g = randint(rand,2,9); 
+      const pow = coin(rand) ? 1 : 0;
+
+    // Build a simple linear inside; signs varied
+      let A = randint(rand,1,6) * (coin(rand)?-1:1);
+      let B = randint(rand,1,9) * (coin(rand)?-1:1);
+
+    // Create polynomial; if pow==1, ensure every term has at least one x by making c0=0
+      const poly = (pow === 1) ? [0, g*B, g*A] : [g*A, g*B, 0]; // [const, x, x^2]
+
+    // Compute the true GCF (numeric and x-power) from the coefficients
+      const gCoef = polyGcdCoef(poly);
+      const gPow  = polyGcdVarPow(poly);
+
+    // Build the inner factor by actually dividing by gCoef * x^gPow
+      const inner = divideByScalarAndXPow(poly, gCoef, gPow); // [const, x, x^2] after division
+
+      const sample = `(${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''})(${polyToHTML(inner[2], inner[1], inner[0])})`;
+
       return makeProblem(poly, sample, 'GCF');
     }
+
 
     function genDiffSquares(rand){
       const a = randint(rand,2,12), b = randint(rand,2,12);
