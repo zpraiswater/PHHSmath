@@ -175,14 +175,47 @@
     }
 
     function genTrinomialAGt1(rand){
-      const p = randint(rand,2,6), q = randint(rand,2,6);
-      const r = randint(rand,1,10) * (coin(rand)?1:-1);
-      const s = randint(rand,1,10) * (coin(rand)?1:-1);
-      const a = p*q, b = p*s + q*r, c = r*s;
-      const poly = [c,b,a];
-      const sample = `(${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})`;
-      return makeProblem(poly, sample, 'AGT1');
-    }
+  const max_ac = 150;
+  let p, q, r, s, a, c, ac;
+
+  do {
+    // p and q are factors of a (a = p*q), limiting to 2 to 6
+    p = randint(rand, 2, 6);
+    q = randint(rand, 2, 6);
+    a = p * q;
+    
+    // Calculate the maximum possible product for c given a
+    const max_c = Math.floor(max_ac / a);
+    
+    // r and s are factors of c (c = r*s), limiting the factors to 1 to 10
+    // The product of |r*s| must be less than or equal to max_c
+    // We can limit r and s such that their product is reasonably small, e.g., max factor of 12
+    const max_factor_limit = Math.min(12, max_c); 
+
+    // Re-roll r and s until |r*s| <= max_c
+    do {
+      r = randint(rand, 1, max_factor_limit) * (coin(rand)?1:-1);
+      s = randint(rand, 1, max_factor_limit) * (coin(rand)?1:-1);
+      c = r * s;
+      ac = a * Math.abs(c);
+      
+      // If c is too large, we re-roll a new pair (r, s)
+      // Check if abs(c) is within the max_c limit, and that c is not zero (r and s are >= 1, so this is fine)
+    } while (Math.abs(c) > max_c);
+    
+    // Re-evaluate ac to ensure the product is <= 150.
+    // The constraints above should ensure this, but a final check is safe.
+    ac = a * Math.abs(c);
+
+    // This loop ensures that the final ac is <= 150 and that a is > 1 (p, q >= 2 means a >= 4)
+  } while (ac > max_ac); 
+
+  const b = p * s + q * r;
+  const poly = [c, b, a];
+  const sample = `(${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})`;
+  
+  return makeProblem(poly, sample, 'AGT1');
+}
 
     function makeProblem(coeffs, sample, kind){
       const gCoef = polyGcdCoef(coeffs);
