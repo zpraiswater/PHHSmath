@@ -160,7 +160,11 @@
 
 
     function genDiffSquares(rand){
-      const a = randint(rand,2,12), b = randint(rand,2,12);
+      let a, b;
+      do {
+        a = randint(rand,2,12);
+        b = randint(rand,2,12);
+      } while (igcd(a,b) !== 1); // no shared numeric factor, so a²x²-b² has no hidden GCF
       const A=a*a, C=-(b*b);
       const poly = [C, 0, A];
       const sample = `(${a}x - ${b})(${a}x + ${b})`;
@@ -203,7 +207,9 @@
       
       // If c is too large, we re-roll a new pair (r, s)
       // Check if abs(c) is within the max_c limit, and that c is not zero (r and s are >= 1, so this is fine)
-    } while (Math.abs(c) > max_c);
+      // Also require p,r and q,s to share no common factor, so (px+r)(qx+s) never
+      // hides a numeric GCF the sample solution doesn't account for.
+    } while (Math.abs(c) > max_c || igcd(p, r) !== 1 || igcd(q, s) !== 1);
     
     // Re-evaluate ac to ensure the product is <= 150.
     // The constraints above should ensure this, but a final check is safe.
