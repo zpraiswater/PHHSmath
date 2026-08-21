@@ -5,8 +5,8 @@
  * exactly as listed below (this script reads/writes by header name, not by
  * fixed column index):
  *
- *   Roster:    SNumber | TeacherName
- *   Responses: Timestamp | Date | SNumber | TeacherName | Score | Total | ProblemsJSON | AnswersJSON
+ *   Roster:    SNumber | StudentName | TeacherName
+ *   Responses: Timestamp | Date | SNumber | StudentName | TeacherName | Score | Total | ProblemsJSON | AnswersJSON
  *
  * ── MANUAL DEPLOYMENT STEPS (do this yourself in the Apps Script UI) ──
  * 1. Open the target Google Sheet, then Extensions > Apps Script, and paste
@@ -30,9 +30,10 @@
 const ROSTER_SHEET_NAME = 'Roster';
 const RESPONSES_SHEET_NAME = 'Responses';
 const UNASSIGNED_TEACHER = 'Unassigned';
+const UNKNOWN_STUDENT = 'Unknown';
 
 const RESPONSES_ROW_ORDER = [
-  'Timestamp', 'Date', 'SNumber', 'TeacherName', 'Score', 'Total', 'ProblemsJSON', 'AnswersJSON'
+  'Timestamp', 'Date', 'SNumber', 'StudentName', 'TeacherName', 'Score', 'Total', 'ProblemsJSON', 'AnswersJSON'
 ];
 
 function getSheet_(name) {
@@ -72,24 +73,30 @@ function normalizeDateValue_(value) {
   return String(value == null ? '' : value).trim();
 }
 
-// SNumber -> TeacherName, matched case-insensitively with trimmed whitespace.
-// Returns UNASSIGNED_TEACHER if no Roster row matches.
-function lookupTeacherName_(sid) {
+// SNumber -> {teacherName, studentName}, matched case-insensitively with
+// trimmed whitespace. Falls back to UNASSIGNED_TEACHER / UNKNOWN_STUDENT for
+// whichever piece is missing (including when no Roster row matches at all).
+function lookupRosterInfo_(sid) {
   const rows = readRowsAsObjects_(getSheet_(ROSTER_SHEET_NAME));
   const target = normalizeSid_(sid);
   for (const row of rows) {
     if (normalizeSid_(row.SNumber) === target) {
-      const name = String(row.TeacherName == null ? '' : row.TeacherName).trim();
-      return name || UNASSIGNED_TEACHER;
+      const teacherName = String(row.TeacherName == null ? '' : row.TeacherName).trim();
+      const studentName = String(row.StudentName == null ? '' : row.StudentName).trim();
+      return {
+        teacherName: teacherName || UNASSIGNED_TEACHER,
+        studentName: studentName || UNKNOWN_STUDENT
+      };
     }
   }
-  return UNASSIGNED_TEACHER;
+  return { teacherName: UNASSIGNED_TEACHER, studentName: UNKNOWN_STUDENT };
 }
 
 /**
  * Accepts a JSON POST body: {date, sid, score, total, problems, answers}.
- * Looks up the student's teacher from Roster (falling back to "Unassigned"
- * rather than rejecting the submission) and appends one row to Responses.
+ * Looks up the student's teacher and name from Roster (falling back to
+ * "Unassigned" / "Unknown" rather than rejecting the submission) and
+ * appends one row to Responses.
  */
 function doPost(e) {
   try {
@@ -97,12 +104,13 @@ function doPost(e) {
       throw new Error('Missing request body.');
     }
     const body = JSON.parse(e.postData.contents);
-    const teacherName = lookupTeacherName_(body.sid);
+    const { teacherName, studentName } = lookupRosterInfo_(body.sid);
 
     const rowByHeader = {
       Timestamp: new Date(),
       Date: body.date,
       SNumber: body.sid,
+      StudentName: studentName,
       TeacherName: teacherName,
       Score: body.score,
       Total: body.total,
@@ -127,7 +135,9 @@ function doPost(e) {
  *
  * With a `teacher` query param (sent verbatim from that dropdown): returns
  * {ok:true, rows:[...]} — every Responses row whose TeacherName exactly
- * matches, optionally further filtered by a `date` query param.
+ * matches, optionally further filtered by a `date` query param. Each row
+ * object carries every Responses column (including StudentName) since
+ * readRowsAsObjects_ maps by header name rather than a fixed column list.
  */
 function doGet(e) {
   try {
