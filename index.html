@@ -67,8 +67,8 @@
         </div>
         <div class="col">
           <label for="sid">Student Number (S-number)</label>
-          <input id="sid" type="text" placeholder="e.g., S123456" aria-describedby="sidError" />
-          <div class="meta err" id="sidError" style="display:none" aria-live="polite">Enter a valid S-number (e.g., S123456).</div>
+          <input id="sid" type="text" placeholder="e.g., S12345" aria-describedby="sidError" />
+          <div class="meta err" id="sidError" style="display:none" aria-live="polite">Enter a valid S-number (e.g., S12345).</div>
         </div>
         <!-- Removed the Generate button column -->
         <div class="col">
@@ -92,8 +92,8 @@
     // === DIRECT-TO-WEBAPP SUBMISSION ===
     // Replace with the deployed Apps Script web app URL (see scripts/Code.gs).
     const WEBAPP_URL = "https://script.google.com/macros/s/AKfycbywwSCOBMFVG5o-hs7bi1xUpH_H2KhBcgxWANq9ABA-NSOJYfEH-o28uku4xD8DiA4t/exec";
-    // Placeholder S-number format — confirm the school's actual pattern and update here.
-    const SID_PATTERN = /^S\d{6}$/i;
+    // Park Hill's S-number format: "S" followed by 5 digits (e.g. S12345).
+    const SID_PATTERN = /^S\d{5}$/i;
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
