@@ -440,7 +440,11 @@
         const res = await fetch(WEBAPP_URL, {
           method: 'POST',
           mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
+          // text/plain avoids a CORS preflight (OPTIONS), which Apps Script
+          // Web Apps don't handle and would otherwise cause a "Failed to
+          // fetch" error. The body is still JSON — doPost parses
+          // e.postData.contents as JSON regardless of the declared type.
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
         });
         const data = await res.json();
