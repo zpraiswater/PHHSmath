@@ -7,32 +7,37 @@
   <meta name="description" content="Enter S-number, answer four factoring questions, check answers, and submit results directly to the review web app (no second click)." />
   <style>
     :root{
-      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
-      --border:#22305e; --input-bg:#f6f8ff; --input-text:#0c1230; --input-bd:#9bb3e3;
-      --btn-submit:#8fe0bf; --btn-submit-hover:#7ad7b2; --btn-submit-text:#053826;
+      --bg:#f7f7f8; --card:#ffffff; --ink:#1a1a1a; --muted:#5c5c5c; --accent:#c8102e; --accent-dark:#a00d25; --ok:#1e8449; --warn:#b45309; --err:#a00d25;
+      --border:#e3e3e6; --input-bg:#ffffff; --input-text:#1a1a1a; --input-bd:#c9c9ce;
+      --btn-submit:#c8102e; --btn-submit-hover:#a00d25; --btn-submit-text:#ffffff;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #15224d 0%, var(--bg) 60%); color:var(--ink)}
+    body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #ffffff 0%, var(--bg) 60%); color:var(--ink)}
     header{padding:24px 20px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
-    h1{margin:0; font-size:clamp(1.2rem,2.2vw + .6rem,2rem); letter-spacing:.3px}
-    .tag{font-size:.9rem; color:#d9e4ff}
+    .brand-tag{font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin-bottom:2px}
+    h1{margin:0; font-size:clamp(1.2rem,2.2vw + .6rem,2rem); letter-spacing:.3px; color:var(--accent)}
+    h1::after{content:''; display:block; width:64px; height:4px; margin-top:8px; background:var(--accent); border-radius:2px}
+    .tag{font-size:.9rem; color:var(--muted)}
     main{max-width:1100px; margin:0 auto; padding:0 16px 48px}
-    .panel{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 2px 12px rgba(0,0,0,.06)}
     .controls{display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:12px; align-items:end}
     .controls .col{display:flex; flex-direction:column; gap:6px}
     label{font-size:.85rem; color:var(--muted)}
     input[type="date"], input[type="text"], input.answer{height:40px; border:1px solid var(--input-bd); border-radius:10px; background:var(--input-bg); color:var(--input-text); padding:0 12px}
-    input.answer::placeholder{color:#6b75a1}
-    input:focus{outline:none; box-shadow:0 0 0 3px rgba(106,166,255,.35)}
-    button{height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#13204d; color:var(--ink); font-weight:600; cursor:pointer}
-    button:hover{background:#192a63}
-    .btn-primary{background:linear-gradient(180deg,#2b56cc,#2348ac); border-color:#2b56cc}
+    input.answer::placeholder{color:#9a9a9e}
+    input:focus{outline:none; box-shadow:0 0 0 3px rgba(200,16,46,.25)}
+    input:disabled{background:#f0f0f2; color:#9a9a9e; border-color:#dcdce0; cursor:not-allowed}
+    button{height:40px; padding:0 14px; border-radius:10px; border:1.5px solid var(--accent); background:#ffffff; color:var(--accent); font-weight:600; cursor:pointer}
+    button:hover{background:#fdeef0}
+    button:disabled{background:#e8e8ea; color:#9a9a9e; border-color:#d8d8db; cursor:not-allowed}
+    .btn-primary{background:var(--accent); color:#ffffff; border-color:var(--accent)}
+    .btn-primary:hover{background:var(--accent-dark); border-color:var(--accent-dark)}
     .btn-submit{background:var(--btn-submit); color:var(--btn-submit-text); border-color:var(--btn-submit-hover);}
     .btn-submit:hover{background:var(--btn-submit-hover)}
     .grid{display:grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap:16px; margin-top:16px}
-    .card{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:14px; padding:16px}
-    .card h3{margin:2px 0 12px; font-size:1rem; color:#cdd7ff; letter-spacing:.3px}
+    .card{background:var(--card); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:0 1px 6px rgba(0,0,0,.05)}
+    .card h3{margin:2px 0 12px; font-size:1rem; color:var(--ink); letter-spacing:.3px}
     .problem{font-size:1.15rem}
     .meta{font-size:.9rem; color:var(--muted)}
     details{margin-top:8px}
@@ -47,6 +52,7 @@
 <body>
   <header>
     <div>
+      <div class="brand-tag">Park Hill Trojans</div>
       <h1>PHHS Daily Factoring Review</h1>
       <div class="tag">Enter S number – Answer questions – Check Answers – Submit Results</div>
     </div>

@@ -7,24 +7,28 @@
   <meta name="description" content="View student factoring-review submissions by teacher, search by name or S-number, filter by date range, and see class performance by problem type." />
   <style>
     :root{
-      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
-      --border:#22305e; --input-bg:#f6f8ff; --input-text:#0c1230; --input-bd:#9bb3e3;
+      --bg:#f7f7f8; --card:#ffffff; --ink:#1a1a1a; --muted:#5c5c5c; --accent:#c8102e; --accent-dark:#a00d25; --ok:#1e8449; --warn:#b45309; --err:#a00d25;
+      --border:#e3e3e6; --input-bg:#ffffff; --input-text:#1a1a1a; --input-bd:#c9c9ce;
     }
     *{box-sizing:border-box}
     html,body{height:100%}
-    body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #15224d 0%, var(--bg) 60%); color:var(--ink)}
+    body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #ffffff 0%, var(--bg) 60%); color:var(--ink)}
     header{padding:24px 20px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
-    h1{margin:0; font-size:clamp(1.2rem,2.2vw + .6rem,2rem); letter-spacing:.3px}
-    .tag{font-size:.9rem; color:#d9e4ff}
+    .brand-tag{font-size:.72rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); margin-bottom:2px}
+    h1{margin:0; font-size:clamp(1.2rem,2.2vw + .6rem,2rem); letter-spacing:.3px; color:var(--accent)}
+    h1::after{content:''; display:block; width:64px; height:4px; margin-top:8px; background:var(--accent); border-radius:2px}
+    .tag{font-size:.9rem; color:var(--muted)}
     main{max-width:1100px; margin:0 auto; padding:0 16px 48px}
-    .panel{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .panel{background:var(--card); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 2px 12px rgba(0,0,0,.06)}
     .controls{display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:12px; align-items:end}
     .controls .col{display:flex; flex-direction:column; gap:6px}
     label{font-size:.85rem; color:var(--muted)}
     input[type="date"], input[type="text"], select{height:40px; border:1px solid var(--input-bd); border-radius:10px; background:var(--input-bg); color:var(--input-text); padding:0 12px}
-    input:focus, select:focus{outline:none; box-shadow:0 0 0 3px rgba(106,166,255,.35)}
-    button{height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#13204d; color:var(--ink); font-weight:600; cursor:pointer}
-    button:hover{background:#192a63}
+    input:focus, select:focus{outline:none; box-shadow:0 0 0 3px rgba(200,16,46,.25)}
+    input:disabled, select:disabled{background:#f0f0f2; color:#9a9a9e; border-color:#dcdce0; cursor:not-allowed}
+    button{height:40px; padding:0 14px; border-radius:10px; border:1.5px solid var(--accent); background:#ffffff; color:var(--accent); font-weight:600; cursor:pointer}
+    button:hover{background:#fdeef0}
+    button:disabled{background:#e8e8ea; color:#9a9a9e; border-color:#d8d8db; cursor:not-allowed}
     .meta{font-size:.9rem; color:var(--muted)}
     .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
     .footnote{color:var(--muted); font-size:.8rem}
@@ -33,7 +37,7 @@
     .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
 
     .summary-grid{display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-top:16px}
-    .stat-card{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:12px; padding:12px}
+    .stat-card{background:var(--card); border:1px solid var(--border); border-radius:12px; padding:12px; box-shadow:0 1px 6px rgba(0,0,0,.04)}
     .stat-card .label{font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em}
     .stat-card .value{font-size:1.4rem; font-weight:700; margin-top:4px}
     .stat-card .sub{font-size:.8rem; color:var(--muted); margin-top:2px}
@@ -42,7 +46,7 @@
     table{width:100%; border-collapse:collapse}
     th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); font-size:.9rem; white-space:nowrap}
     th{color:var(--muted); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em}
-    tbody tr:hover{background:rgba(255,255,255,.03)}
+    tbody tr:hover{background:rgba(200,16,46,.04)}
     .name-missing{color:var(--muted); font-style:italic}
     .name-missing .note{display:block; font-size:.72rem; font-style:normal; margin-top:2px}
   </style>
@@ -50,6 +54,7 @@
 <body>
   <header>
     <div>
+      <div class="brand-tag">Park Hill Trojans</div>
       <h1>PHHS Teacher Dashboard</h1>
       <div class="tag">Select your name to view your students' factoring review submissions</div>
     </div>
