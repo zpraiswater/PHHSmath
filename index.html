@@ -417,7 +417,7 @@
       const scoreMatch = (document.getElementById('score')?.textContent || "").match(/Score:\s*(\d+)/);
       const score = scoreMatch ? Number(scoreMatch[1]) : "";
 
-      const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.kind || null }));
+      const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.kind || null, gCoef: p.gCoef, gPow: p.gPow }));
       const answers  = set.map((_, i) => ({ raw: document.getElementById(`ans-${i}`)?.value || "" }));
 
       const payload = { date, sid, score, total: set.length, problems, answers };
