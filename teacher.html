@@ -351,6 +351,8 @@
         let problems = [], answers = [];
         try { problems = JSON.parse(row.ProblemsJSON || '[]'); } catch(e) {}
         try { answers  = JSON.parse(row.AnswersJSON  || '[]'); } catch(e) {}
+        if(!Array.isArray(problems)) problems = [];
+        if(!Array.isArray(answers)) answers = [];
 
         problems.forEach((p, i) => {
           const bucket = p && perType[p.type];
