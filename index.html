@@ -74,7 +74,7 @@
       <div class="row" style="margin-top:12px">
         <button id="checkBtn" class="btn-primary">Check Answers</button>
         <button id="submitBtn" class="btn-submit" disabled>Submit Results</button>
-        <span id="score" class="status"></span>
+        <span id="score" class="status" aria-live="polite"></span>
       </div>
       <div class="footnote" style="margin-top:8px"></div>
     </section>
@@ -281,9 +281,9 @@
             <div class="problem">Factor: <strong>${html}</strong></div>
             <div class="row" style="margin-top:8px">
               <label class="meta">Your answer (use parentheses, e.g., (x+3)(2x-5))</label>
-              <input class="answer" id="ans-${i}" type="text" placeholder="e.g., (x+3)(x+4) or -1(x-2)(x-3)" />
+              <input class="answer" id="ans-${i}" type="text" placeholder="e.g., (x+3)(x+4) or -1(x-2)(x-3)" aria-label="Your answer for problem ${i+1}" />
             </div>
-            <div class="meta" id="msg-${i}" style="min-height:22px; margin-top:6px"></div>
+            <div class="meta" id="msg-${i}" style="min-height:22px; margin-top:6px" aria-live="polite"></div>
             <div id="sol-${i}"></div>
           </article>`;
       }).join('');
