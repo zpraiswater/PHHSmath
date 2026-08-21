@@ -61,7 +61,8 @@
         </div>
         <div class="col">
           <label for="sid">Student Number (S-number)</label>
-          <input id="sid" type="text" placeholder="e.g., S123456" />
+          <input id="sid" type="text" placeholder="e.g., S123456" aria-describedby="sidError" />
+          <div class="meta err" id="sidError" style="display:none" aria-live="polite">Enter a valid S-number (e.g., S123456).</div>
         </div>
         <!-- Removed the Generate button column -->
         <div class="col">
@@ -72,7 +73,7 @@
 
       <div class="grid" id="problems"></div>
       <div class="row" style="margin-top:12px">
-        <button id="checkBtn" class="btn-primary">Check Answers</button>
+        <button id="checkBtn" class="btn-primary" disabled>Check Answers</button>
         <button id="submitBtn" class="btn-submit" disabled>Submit Results</button>
         <span id="score" class="status" aria-live="polite"></span>
       </div>
@@ -84,6 +85,8 @@
     // === DIRECT-TO-GOOGLE-FORM (no second click) ===
     // Form URL example: https://docs.google.com/forms/d/e/FORM_ID/viewform
     const FORM_ID = "1FAIpQLScMe4NY3BsH62BFW4674lgkQ1f5thwKuvdLQ52R0Zs7I-KrHQ"; // your form ID
+    // Placeholder S-number format — confirm the school's actual pattern and update here.
+    const SID_PATTERN = /^S\d{6}$/i;
     const ENTRY = {
       date:     "entry.410399227",
       sid:      "entry.1818636007",
@@ -256,9 +259,24 @@
     const problemsEl = document.getElementById('problems');
     const dateEl = document.getElementById('date');
     const sidEl = document.getElementById('sid');
+    const sidErrorEl = document.getElementById('sidError');
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
     const scoreEl = document.getElementById('score');
+    let graded = false;
+
+    function isValidSid(){ return SID_PATTERN.test(sidEl.value.trim()); }
+
+    function updateSubmitState(){ btnSubmit.disabled = !(graded && isValidSid()); }
+
+    function updateSidValidation(){
+      const val = sidEl.value.trim();
+      const valid = isValidSid();
+      sidErrorEl.style.display = (val && !valid) ? 'block' : 'none';
+      btnCheck.disabled = !valid;
+      updateSubmitState();
+      return valid;
+    }
 
     function currentSeed(){ return (dateEl.value || chicagoISO()); }
 
@@ -289,7 +307,8 @@
       }).join('');
       window.__currentSet = set;
       scoreEl.textContent = '';
-      btnSubmit.disabled = true;
+      graded = false;
+      updateSubmitState();
     }
 
     function multiplyMonomials(mon, f){ return polyMul(mon,f); }
@@ -307,6 +326,7 @@
 
     function checkAnswers(){
       if(!window.__currentSet) return;
+      if(!updateSidValidation()) return;
       const set = window.__currentSet;
       let correct=0;
       for(let i=0;i<set.length;i++){
@@ -370,11 +390,13 @@
         correct++;
       }
       scoreEl.textContent = `Score: ${correct}/${set.length}`;
-      btnSubmit.disabled = false;
+      graded = true;
+      updateSubmitState();
       return correct;
     }
 
     function submitViaFormDirect(){
+      if(!updateSidValidation()) return;
       const date = document.getElementById('date')?.value || "";
       const sid  = (document.getElementById('sid')?.value || "").trim();
       const set  = window.__currentSet || [];
@@ -407,13 +429,14 @@
     }
 
     // ======= Init & Events =======
-    function chicagoOnLoad(){ readParams(); generate(); }
+    function chicagoOnLoad(){ readParams(); generate(); updateSidValidation(); }
     chicagoOnLoad();
 
     // Auto-regenerate when the date changes so students never need a button
     document.getElementById('date').addEventListener('change', generate);
 
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
+    sidEl.addEventListener('input', updateSidValidation);
     btnCheck.addEventListener('click', checkAnswers);
     btnSubmit.addEventListener('click', submitViaFormDirect);
   </script>
