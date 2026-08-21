@@ -269,6 +269,16 @@
       submitMsgEl.className = 'meta' + (kind ? ` ${kind}` : '');
     }
 
+    function uppercaseSidInput(){
+      const start = sidEl.selectionStart;
+      const end = sidEl.selectionEnd;
+      const upper = sidEl.value.toUpperCase();
+      if(upper !== sidEl.value){
+        sidEl.value = upper;
+        sidEl.setSelectionRange(start, end);
+      }
+    }
+
     function updateSidValidation(){
       const val = sidEl.value.trim();
       const valid = isValidSid();
@@ -455,7 +465,7 @@
     document.getElementById('date').addEventListener('change', generate);
 
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
-    sidEl.addEventListener('input', updateSidValidation);
+    sidEl.addEventListener('input', () => { uppercaseSidInput(); updateSidValidation(); });
     btnCheck.addEventListener('click', checkAnswers);
     btnSubmit.addEventListener('click', submitViaWebApp);
   </script>
