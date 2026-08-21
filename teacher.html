@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PHHS Teacher Dashboard</title>
-  <meta name="description" content="View student factoring-review submissions by teacher, filter by date range, and see class performance by problem type." />
+  <meta name="description" content="View student factoring-review submissions by teacher, search by name or S-number, filter by date range, and see class performance by problem type." />
   <style>
     :root{
       --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
@@ -21,7 +21,7 @@
     .controls{display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:12px; align-items:end}
     .controls .col{display:flex; flex-direction:column; gap:6px}
     label{font-size:.85rem; color:var(--muted)}
-    input[type="date"], select{height:40px; border:1px solid var(--input-bd); border-radius:10px; background:var(--input-bg); color:var(--input-text); padding:0 12px}
+    input[type="date"], input[type="text"], select{height:40px; border:1px solid var(--input-bd); border-radius:10px; background:var(--input-bg); color:var(--input-text); padding:0 12px}
     input:focus, select:focus{outline:none; box-shadow:0 0 0 3px rgba(106,166,255,.35)}
     button{height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#13204d; color:var(--ink); font-weight:600; cursor:pointer}
     button:hover{background:#192a63}
@@ -43,6 +43,8 @@
     th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); font-size:.9rem; white-space:nowrap}
     th{color:var(--muted); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em}
     tbody tr:hover{background:rgba(255,255,255,.03)}
+    .name-missing{color:var(--muted); font-style:italic}
+    .name-missing .note{display:block; font-size:.72rem; font-style:normal; margin-top:2px}
   </style>
 </head>
 <body>
@@ -63,6 +65,10 @@
           </select>
         </div>
         <div class="col">
+          <label for="searchInput">Search</label>
+          <input id="searchInput" type="text" placeholder="Name or S-number" disabled />
+        </div>
+        <div class="col">
           <label for="dateFrom">From</label>
           <input id="dateFrom" type="date" disabled />
         </div>
@@ -81,7 +87,7 @@
       <div class="table-wrap" id="tableSection" style="display:none">
         <table id="rowsTable">
           <thead>
-            <tr><th>Date</th><th>S-Number</th><th>Score / Total</th><th>Timestamp</th></tr>
+            <tr><th>Date</th><th>S-Number</th><th>Student Name</th><th>Score / Total</th><th>Timestamp</th></tr>
           </thead>
           <tbody id="rowsTbody"></tbody>
         </table>
@@ -159,6 +165,7 @@
 
     // ======= State & DOM refs =======
     const teacherSelect = document.getElementById('teacherSelect');
+    const searchInputEl = document.getElementById('searchInput');
     const dateFromEl = document.getElementById('dateFrom');
     const dateToEl = document.getElementById('dateTo');
     const statusMsgEl = document.getElementById('statusMsg');
@@ -254,6 +261,7 @@
     async function loadRows(teacher){
       allRows = [];
       renderAll([]);
+      searchInputEl.disabled = true;
       dateFromEl.disabled = true;
       dateToEl.disabled = true;
       setStatus(`Loading submissions for ${teacher}…`);
@@ -264,10 +272,12 @@
         if(!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
 
         allRows = Array.isArray(data.rows) ? data.rows : [];
+        searchInputEl.disabled = false;
         dateFromEl.disabled = false;
         dateToEl.disabled = false;
         applyFilterAndRender();
       } catch(err){
+        searchInputEl.disabled = true;
         dateFromEl.disabled = true;
         dateToEl.disabled = true;
         showRetry(`Couldn't load submissions: ${err.message || err}.`, () => loadRows(teacher));
@@ -283,22 +293,34 @@
       return m ? m[0] : String(v);
     }
 
+    // Matches the search box against either StudentName or SNumber, so a
+    // teacher can type either one and still find the row.
+    function matchesSearch(row, search){
+      if(!search) return true;
+      const name = String(row.StudentName == null ? '' : row.StudentName).toLowerCase();
+      const num = String(row.SNumber == null ? '' : row.SNumber).toLowerCase();
+      return name.includes(search) || num.includes(search);
+    }
+
     function applyFilterAndRender(){
       const from = dateFromEl.value;
       const to = dateToEl.value;
+      const search = searchInputEl.value.trim().toLowerCase();
+
       const filtered = allRows.filter(row => {
         const d = normalizeDate(row.Date);
         if(from && d < from) return false;
         if(to && d > to) return false;
-        return true;
+        return matchesSearch(row, search);
       });
       renderAll(filtered);
 
       const teacher = teacherSelect.value;
+      const filtersActive = Boolean(from || to || search);
       if(allRows.length === 0){
         setStatus(`No submissions yet for ${teacher}.`, 'warn');
       } else if(filtered.length === 0){
-        setStatus('No submissions in this date range.', 'warn');
+        setStatus(filtersActive ? 'No submissions match your filters.' : 'No submissions found.', 'warn');
       } else {
         setStatus('');
       }
@@ -384,6 +406,7 @@
         const tr = document.createElement('tr');
         tr.appendChild(td(normalizeDate(row.Date)));
         tr.appendChild(td(row.SNumber != null ? String(row.SNumber) : ''));
+        tr.appendChild(nameCell(row));
         tr.appendChild(td(`${row.Score != null ? row.Score : '—'} / ${row.Total != null ? row.Total : '—'}`));
 
         const ts = Date.parse(row.Timestamp);
@@ -399,6 +422,27 @@
       return cell;
     }
 
+    // Falls back to showing the S-Number (grayed out, with a small note)
+    // when StudentName is missing or the backend's "Unknown" placeholder,
+    // so gaps in the Roster are easy to spot at a glance.
+    function nameCell(row){
+      const cell = document.createElement('td');
+      const name = row.StudentName == null ? '' : String(row.StudentName).trim();
+      if(name && name !== 'Unknown'){
+        cell.textContent = name;
+        return cell;
+      }
+      cell.className = 'name-missing';
+      const main = document.createElement('div');
+      main.textContent = row.SNumber != null ? String(row.SNumber) : '—';
+      const note = document.createElement('span');
+      note.className = 'note';
+      note.textContent = 'no name on file';
+      cell.appendChild(main);
+      cell.appendChild(note);
+      return cell;
+    }
+
     // ======= Init & Events =======
     teacherSelect.addEventListener('change', () => {
       const name = teacherSelect.value;
@@ -406,6 +450,7 @@
       try { localStorage.setItem(STORAGE_KEY, name); } catch(e) {}
       loadRows(name);
     });
+    searchInputEl.addEventListener('input', applyFilterAndRender);
     dateFromEl.addEventListener('change', applyFilterAndRender);
     dateToEl.addEventListener('change', applyFilterAndRender);
 
