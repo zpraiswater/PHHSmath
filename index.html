@@ -395,10 +395,21 @@
       return correct;
     }
 
+    function submissionKey(date, sid){ return `submitted_${date}_${sid}`; }
+
     function submitViaFormDirect(){
       if(!updateSidValidation()) return;
       const date = document.getElementById('date')?.value || "";
       const sid  = (document.getElementById('sid')?.value || "").trim();
+      const key = submissionKey(date, sid);
+
+      let alreadySubmitted = false;
+      try { alreadySubmitted = !!localStorage.getItem(key); } catch(e) {}
+      if(alreadySubmitted){
+        const proceed = confirm(`You already submitted today's results as ${sid} — submit again?`);
+        if(!proceed) return;
+      }
+
       const set  = window.__currentSet || [];
 
       const scoreMatch = (document.getElementById('score')?.textContent || "").match(/Score:\s*(\d+)/);
@@ -425,6 +436,7 @@
         body: params.toString()
       });
 
+      try { localStorage.setItem(key, '1'); } catch(e) {}
       alert('Submitted!');
     }
 
