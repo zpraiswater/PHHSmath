@@ -60,8 +60,10 @@ function readRowsAsObjects_(sheet) {
   });
 }
 
+// Canonical S-number form used both for Roster comparisons and for what
+// gets written into Responses, so all stored records use consistent casing.
 function normalizeSid_(sid) {
-  return String(sid == null ? '' : sid).trim().toLowerCase();
+  return String(sid == null ? '' : sid).trim().toUpperCase();
 }
 
 // Sheets sometimes auto-converts a plain "YYYY-MM-DD" string into a Date
@@ -104,12 +106,13 @@ function doPost(e) {
       throw new Error('Missing request body.');
     }
     const body = JSON.parse(e.postData.contents);
-    const { teacherName, studentName } = lookupRosterInfo_(body.sid);
+    const normalizedSid = normalizeSid_(body.sid);
+    const { teacherName, studentName } = lookupRosterInfo_(normalizedSid);
 
     const rowByHeader = {
       Timestamp: new Date(),
       Date: body.date,
-      SNumber: body.sid,
+      SNumber: normalizedSid,
       StudentName: studentName,
       TeacherName: teacherName,
       Score: body.score,
