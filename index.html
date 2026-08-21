@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>PHHS Daily Factoring Review</title>
-  <meta name="description" content="Enter S-number, answer four factoring questions, check answers, and submit results directly to a Google Form (no second click)." />
+  <meta name="description" content="Enter S-number, answer four factoring questions, check answers, and submit results directly to the review web app (no second click)." />
   <style>
     :root{
       --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
@@ -77,24 +77,17 @@
         <button id="submitBtn" class="btn-submit" disabled>Submit Results</button>
         <span id="score" class="status" aria-live="polite"></span>
       </div>
+      <div class="meta" id="submitMsg" style="min-height:22px; margin-top:6px" aria-live="polite"></div>
       <div class="footnote" style="margin-top:8px"></div>
     </section>
   </main>
 
   <script>
-    // === DIRECT-TO-GOOGLE-FORM (no second click) ===
-    // Form URL example: https://docs.google.com/forms/d/e/FORM_ID/viewform
-    const FORM_ID = "1FAIpQLScMe4NY3BsH62BFW4674lgkQ1f5thwKuvdLQ52R0Zs7I-KrHQ"; // your form ID
+    // === DIRECT-TO-WEBAPP SUBMISSION ===
+    // Replace with the deployed Apps Script web app URL (see scripts/Code.gs).
+    const WEBAPP_URL = "https://script.google.com/macros/s/REPLACE_WITH_DEPLOYMENT_ID/exec";
     // Placeholder S-number format — confirm the school's actual pattern and update here.
     const SID_PATTERN = /^S\d{6}$/i;
-    const ENTRY = {
-      date:     "entry.410399227",
-      sid:      "entry.1818636007",
-      score:    "entry.630397787",
-      total:    "entry.1486885887",
-      problems: "entry.1525540760",
-      answers:  "entry.726459644"
-    };
 
     // ======= Seeded RNG (xmur3 + mulberry32) =======
     function xmur3(str) { let h = 1779033703 ^ str.length; for (let i=0;i<str.length;i++){ h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = (h << 13) | (h >>> 19);} return function(){ h = Math.imul(h ^ (h >>> 16), 2246822507); h = Math.imul(h ^ (h >>> 13), 3266489909); return (h ^= h >>> 16) >>> 0; }; }
@@ -263,11 +256,18 @@
     const btnCheck = document.getElementById('checkBtn');
     const btnSubmit = document.getElementById('submitBtn');
     const scoreEl = document.getElementById('score');
+    const submitMsgEl = document.getElementById('submitMsg');
     let graded = false;
+    let submitting = false;
 
     function isValidSid(){ return SID_PATTERN.test(sidEl.value.trim()); }
 
-    function updateSubmitState(){ btnSubmit.disabled = !(graded && isValidSid()); }
+    function updateSubmitState(){ btnSubmit.disabled = submitting || !(graded && isValidSid()); }
+
+    function setSubmitMsg(text, kind){
+      submitMsgEl.textContent = text || '';
+      submitMsgEl.className = 'meta' + (kind ? ` ${kind}` : '');
+    }
 
     function updateSidValidation(){
       const val = sidEl.value.trim();
@@ -308,6 +308,8 @@
       window.__currentSet = set;
       scoreEl.textContent = '';
       graded = false;
+      submitting = false;
+      setSubmitMsg('');
       updateSubmitState();
     }
 
@@ -397,7 +399,7 @@
 
     function submissionKey(date, sid){ return `submitted_${date}_${sid}`; }
 
-    function submitViaFormDirect(){
+    async function submitViaWebApp(){
       if(!updateSidValidation()) return;
       const date = document.getElementById('date')?.value || "";
       const sid  = (document.getElementById('sid')?.value || "").trim();
@@ -418,26 +420,31 @@
       const problems = set.map(p => ({ coeffs: p.coeffs || null, type: p.kind || null }));
       const answers  = set.map((_, i) => ({ raw: document.getElementById(`ans-${i}`)?.value || "" }));
 
-      const action = `https://docs.google.com/forms/d/e/${FORM_ID}/formResponse`;
-      const params = new URLSearchParams();
-      params.set(ENTRY.date,     date);
-      params.set(ENTRY.sid,      sid);
-      params.set(ENTRY.score,    score);
-      params.set(ENTRY.total,    set.length);
-      params.set(ENTRY.problems, JSON.stringify(problems));
-      params.set(ENTRY.answers,  JSON.stringify(answers));
-      params.set('fvv', '1');
-      params.set('submit', 'Submit');
+      const payload = { date, sid, score, total: set.length, problems, answers };
 
-      fetch(action, {
-        method: 'POST',
-        mode:   'no-cors',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
-      });
+      submitting = true;
+      updateSubmitState();
+      setSubmitMsg('Submitting…');
 
-      try { localStorage.setItem(key, '1'); } catch(e) {}
-      alert('Submitted!');
+      try {
+        const res = await fetch(WEBAPP_URL, {
+          method: 'POST',
+          mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if(!res.ok || !data.ok){
+          throw new Error(data.error || `Request failed (${res.status})`);
+        }
+        try { localStorage.setItem(key, '1'); } catch(e) {}
+        setSubmitMsg('Submitted ✔', 'ok');
+        // Leave the button disabled: the submission succeeded, no retry needed.
+      } catch(err){
+        setSubmitMsg(`Submit failed: ${err.message || err}. Please try again.`, 'err');
+        submitting = false;
+        updateSubmitState();
+      }
     }
 
     // ======= Init & Events =======
@@ -450,7 +457,7 @@
     document.getElementById('printBtn').addEventListener('click', ()=>window.print());
     sidEl.addEventListener('input', updateSidValidation);
     btnCheck.addEventListener('click', checkAnswers);
-    btnSubmit.addEventListener('click', submitViaFormDirect);
+    btnSubmit.addEventListener('click', submitViaWebApp);
   </script>
 </body>
 </html>
