@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PHHS Teacher Dashboard</title>
+  <meta name="description" content="View student factoring-review submissions by teacher, filter by date range, and see class performance by problem type." />
+  <style>
+    :root{
+      --bg:#0b1020; --card:#111833; --ink:#e9edf7; --muted:#b7c0d9; --accent:#6aa6ff; --ok:#2fd37a; --warn:#f9ac3d; --err:#ef6666;
+      --border:#22305e; --input-bg:#f6f8ff; --input-text:#0c1230; --input-bd:#9bb3e3;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Inter,sans-serif; background: radial-gradient(1200px 900px at 10% 0%, #15224d 0%, var(--bg) 60%); color:var(--ink)}
+    header{padding:24px 20px 10px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+    h1{margin:0; font-size:clamp(1.2rem,2.2vw + .6rem,2rem); letter-spacing:.3px}
+    .tag{font-size:.9rem; color:#d9e4ff}
+    main{max-width:1100px; margin:0 auto; padding:0 16px 48px}
+    .panel{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:16px; padding:16px; box-shadow:0 10px 30px rgba(0,0,0,.35)}
+    .controls{display:grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap:12px; align-items:end}
+    .controls .col{display:flex; flex-direction:column; gap:6px}
+    label{font-size:.85rem; color:var(--muted)}
+    input[type="date"], select{height:40px; border:1px solid var(--input-bd); border-radius:10px; background:var(--input-bg); color:var(--input-text); padding:0 12px}
+    input:focus, select:focus{outline:none; box-shadow:0 0 0 3px rgba(106,166,255,.35)}
+    button{height:40px; padding:0 14px; border-radius:10px; border:1px solid var(--border); background:#13204d; color:var(--ink); font-weight:600; cursor:pointer}
+    button:hover{background:#192a63}
+    .meta{font-size:.9rem; color:var(--muted)}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap}
+    .footnote{color:var(--muted); font-size:.8rem}
+    @media (max-width:860px){.controls{grid-template-columns: repeat(2, minmax(0,1fr))}}
+    .status{font-weight:700}
+    .ok{color:var(--ok)} .err{color:var(--err)} .warn{color:var(--warn)}
+
+    .summary-grid{display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-top:16px}
+    .stat-card{background:linear-gradient(180deg,#121a37,#0e1530); border:1px solid var(--border); border-radius:12px; padding:12px}
+    .stat-card .label{font-size:.72rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em}
+    .stat-card .value{font-size:1.4rem; font-weight:700; margin-top:4px}
+    .stat-card .sub{font-size:.8rem; color:var(--muted); margin-top:2px}
+
+    .table-wrap{overflow-x:auto; margin-top:16px}
+    table{width:100%; border-collapse:collapse}
+    th,td{text-align:left; padding:8px 10px; border-bottom:1px solid var(--border); font-size:.9rem; white-space:nowrap}
+    th{color:var(--muted); font-weight:600; font-size:.75rem; text-transform:uppercase; letter-spacing:.04em}
+    tbody tr:hover{background:rgba(255,255,255,.03)}
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>PHHS Teacher Dashboard</h1>
+      <div class="tag">Select your name to view your students' factoring review submissions</div>
+    </div>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="controls">
+        <div class="col">
+          <label for="teacherSelect">Teacher</label>
+          <select id="teacherSelect" disabled>
+            <option value="" disabled selected>Loading teachers…</option>
+          </select>
+        </div>
+        <div class="col">
+          <label for="dateFrom">From</label>
+          <input id="dateFrom" type="date" disabled />
+        </div>
+        <div class="col">
+          <label for="dateTo">To</label>
+          <input id="dateTo" type="date" disabled />
+        </div>
+      </div>
+
+      <div class="meta" id="statusMsg" style="min-height:22px; margin-top:12px" aria-live="polite"></div>
+
+      <div id="summarySection" style="display:none">
+        <div class="summary-grid" id="summaryGrid"></div>
+      </div>
+
+      <div class="table-wrap" id="tableSection" style="display:none">
+        <table id="rowsTable">
+          <thead>
+            <tr><th>Date</th><th>S-Number</th><th>Score / Total</th><th>Timestamp</th></tr>
+          </thead>
+          <tbody id="rowsTbody"></tbody>
+        </table>
+      </div>
+
+      <div class="footnote" style="margin-top:12px">Data comes from the same web app that records student submissions (see scripts/Code.gs).</div>
+    </section>
+  </main>
+
+  <script>
+    // Replace with the deployed Apps Script web app URL — must match the
+    // WEBAPP_URL used in index.html (see scripts/Code.gs).
+    const WEBAPP_URL = "https://script.google.com/macros/s/REPLACE_WITH_DEPLOYMENT_ID/exec";
+    const STORAGE_KEY = "phhsTeacherDashboard.selectedTeacher";
+
+    // ======= Grading replica =======
+    // Mirrors index.html's checkAnswers() logic so the per-problem-type
+    // correct/incorrect breakdown below matches what students actually saw.
+    // Keep this in sync with index.html if the grading rules ever change.
+    function polyAdd(a,b){ return [a[0]+b[0], a[1]+b[1], a[2]+b[2]]; }
+    function polyMul(a,b){ return [ a[0]*b[0], a[0]*b[1]+a[1]*b[0], a[0]*b[2]+a[1]*b[1]+a[2]*b[0] ]; }
+    function polyEqual(s, t){ return s[0]===t[0] && s[1]===t[1] && s[2]===t[2]; }
+    function isMonomial(poly){ return (poly[0]!==0) + (poly[1]!==0) + (poly[2]!==0) === 1; }
+    function degree(poly){ return poly[2]!==0 ? 2 : (poly[1]!==0 ? 1 : (poly[0]!==0 ? 0 : -Infinity)); }
+    function monomialCoefPow(poly){ if(poly[2]!==0) return {coef:poly[2], pow:2}; if(poly[1]!==0) return {coef:poly[1], pow:1}; return {coef:poly[0], pow:0}; }
+    function multiplyMonomials(mon, f){ return polyMul(mon,f); }
+
+    function splitTopLevel(s, sep){ const out=[]; let depth=0; let start=0; for(let i=0;i<s.length;i++){ const c=s[i]; if(c==='(') depth++; else if(c===')') depth--; else if(c===sep && depth===0){ out.push(s.slice(start,i)); start=i+1; } } out.push(s.slice(start)); return out.filter(Boolean); }
+    function parseTerm(t){ if(!t) return null; let coef=0, pow=0; if(t.includes('x')){ const [left, ...right] = t.split('x'); const before = left; if(before===''||before==='+') coef=1; else if(before==='-') coef=-1; else coef=parseFloat(before); pow=1; if(right.length>0){ const rest = right.join('x'); if(rest.startsWith('^')){ const p = parseInt(rest.slice(1),10); pow = isNaN(p)?1:p; } } } else { coef=parseFloat(t); pow=0; } if(isNaN(coef)) return null; if(pow<0 || pow>2) return null; const arr=[0,0,0]; arr[pow]=coef; return arr; }
+    function parseSum(s){ const terms = s.match(/[+-]?[^+-]+/g); if(!terms) return null; let poly=[0,0,0]; for(const t of terms){ const pt = parseTerm(t); if(!pt) return null; poly = polyAdd(poly, pt); } return poly; }
+    function parseFactor(f){ if(f[0]==='(' && f[f.length-1]===')') return parseSum(f.slice(1,-1)); return parseSum(f); }
+    function expandExpression(expr){
+      if(!expr) return null;
+      let s = expr.replace(/\s+/g,'');
+      s = s.replace(/([0-9x])\(/g, '$1*(').replace(/\)\(/g, ')*(').replace(/\)([0-9x])/g, ')*$1');
+      const factorStrs = splitTopLevel(s,'*');
+      if(factorStrs.length===0) return null;
+      const factorPolys=[];
+      let poly = [1,0,0];
+      for(const f of factorStrs){ const pf = parseFactor(f); if(!pf) return null; factorPolys.push(pf); poly = polyMul(poly, pf); }
+      return { poly, factorPolys };
+    }
+
+    // problem: {coeffs:[c0,c1,c2], type, gCoef, gPow} — gCoef/gPow are absent
+    // on rows submitted before that field was added; treated as "no GCF
+    // required" for those older rows.
+    function isAnswerCorrect(raw, problem){
+      const inp = (raw || '').trim();
+      if(!inp || !problem || !problem.coeffs) return false;
+
+      const parsed = expandExpression(inp);
+      if(!parsed) return false;
+      if(!polyEqual(parsed.poly, problem.coeffs)) return false;
+
+      let mon=[1,0,0];
+      for(const f of parsed.factorPolys){ if(isMonomial(f)) mon = multiplyMonomials(mon,f); }
+      const {coef:monC,pow:monP} = monomialCoefPow(mon);
+      const monAbs = Math.abs(monC);
+
+      const gCoef = problem.gCoef || 0, gPow = problem.gPow || 0;
+      if(gCoef>1 || gPow>0){
+        if(!(monAbs===gCoef && monP===gPow)) return false;
+      }
+
+      if(problem.type !== 'GCF'){
+        const nonMono = parsed.factorPolys.filter(f => !isMonomial(f));
+        const allLinear = nonMono.every(f => degree(f) === 1);
+        if(nonMono.length < 2 || !allLinear) return false;
+      } else {
+        if(parsed.factorPolys.length < 2) return false;
+      }
+
+      return true;
+    }
+
+    // ======= State & DOM refs =======
+    const teacherSelect = document.getElementById('teacherSelect');
+    const dateFromEl = document.getElementById('dateFrom');
+    const dateToEl = document.getElementById('dateTo');
+    const statusMsgEl = document.getElementById('statusMsg');
+    const summarySection = document.getElementById('summarySection');
+    const summaryGrid = document.getElementById('summaryGrid');
+    const tableSection = document.getElementById('tableSection');
+    const rowsTbody = document.getElementById('rowsTbody');
+
+    const PROBLEM_TYPES = [
+      { key: 'GCF',  label: 'GCF' },
+      { key: 'DIFF', label: 'Difference of Squares' },
+      { key: 'A1',   label: 'Trinomial (a=1)' },
+      { key: 'AGT1', label: 'Trinomial (a>1)' }
+    ];
+
+    let allRows = [];
+
+    function fetchUrl(params){
+      const url = new URL(WEBAPP_URL);
+      Object.entries(params || {}).forEach(([k,v]) => { if(v) url.searchParams.set(k, v); });
+      url.searchParams.set('_ts', Date.now()); // avoid stale cached GET responses
+      return url.toString();
+    }
+
+    function setStatus(text, kind){
+      statusMsgEl.textContent = text || '';
+      statusMsgEl.className = 'meta' + (kind ? ` ${kind}` : '');
+    }
+
+    function showRetry(message, retryFn){
+      statusMsgEl.textContent = '';
+      statusMsgEl.className = 'meta err';
+      statusMsgEl.appendChild(document.createTextNode(message + ' '));
+      const btn = document.createElement('button');
+      btn.textContent = 'Try again';
+      btn.style.height = '28px';
+      btn.style.padding = '0 10px';
+      btn.addEventListener('click', retryFn);
+      statusMsgEl.appendChild(btn);
+    }
+
+    function clearChildren(el){ while(el.firstChild) el.removeChild(el.firstChild); }
+
+    // ======= Loading teachers =======
+    async function loadTeachers(){
+      teacherSelect.disabled = true;
+      setStatus('Loading teachers…');
+      try {
+        const res = await fetch(fetchUrl({}), { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+        if(!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+        clearChildren(teacherSelect);
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.disabled = true;
+        placeholder.textContent = 'Select your name';
+        teacherSelect.appendChild(placeholder);
+
+        const teachers = Array.isArray(data.teachers) ? data.teachers : [];
+        teachers.forEach(name => {
+          const opt = document.createElement('option');
+          opt.value = name;
+          opt.textContent = name;
+          teacherSelect.appendChild(opt);
+        });
+
+        if(teachers.length === 0){
+          placeholder.selected = true;
+          teacherSelect.disabled = true;
+          setStatus('No teachers found in the roster yet.', 'warn');
+          return;
+        }
+
+        teacherSelect.disabled = false;
+        setStatus('');
+
+        let saved = null;
+        try { saved = localStorage.getItem(STORAGE_KEY); } catch(e) {}
+        if(saved && teachers.includes(saved)){
+          teacherSelect.value = saved;
+          loadRows(saved);
+        } else {
+          placeholder.selected = true;
+        }
+      } catch(err){
+        teacherSelect.disabled = true;
+        showRetry(`Couldn't load the teacher list: ${err.message || err}.`, loadTeachers);
+      }
+    }
+
+    // ======= Loading rows for a teacher =======
+    async function loadRows(teacher){
+      allRows = [];
+      renderAll([]);
+      dateFromEl.disabled = true;
+      dateToEl.disabled = true;
+      setStatus(`Loading submissions for ${teacher}…`);
+
+      try {
+        const res = await fetch(fetchUrl({ teacher }), { method: 'GET', mode: 'cors' });
+        const data = await res.json();
+        if(!res.ok || !data.ok) throw new Error(data.error || `Request failed (${res.status})`);
+
+        allRows = Array.isArray(data.rows) ? data.rows : [];
+        dateFromEl.disabled = false;
+        dateToEl.disabled = false;
+        applyFilterAndRender();
+      } catch(err){
+        dateFromEl.disabled = true;
+        dateToEl.disabled = true;
+        showRetry(`Couldn't load submissions: ${err.message || err}.`, () => loadRows(teacher));
+      }
+    }
+
+    // ======= Filtering (client-side, over the already-fetched row set —
+    // the backend's `date` param only supports an exact-match single day,
+    // not a range) =======
+    function normalizeDate(v){
+      if(v == null) return '';
+      const m = String(v).match(/^\d{4}-\d{2}-\d{2}/);
+      return m ? m[0] : String(v);
+    }
+
+    function applyFilterAndRender(){
+      const from = dateFromEl.value;
+      const to = dateToEl.value;
+      const filtered = allRows.filter(row => {
+        const d = normalizeDate(row.Date);
+        if(from && d < from) return false;
+        if(to && d > to) return false;
+        return true;
+      });
+      renderAll(filtered);
+
+      const teacher = teacherSelect.value;
+      if(allRows.length === 0){
+        setStatus(`No submissions yet for ${teacher}.`, 'warn');
+      } else if(filtered.length === 0){
+        setStatus('No submissions in this date range.', 'warn');
+      } else {
+        setStatus('');
+      }
+    }
+
+    // ======= Rendering =======
+    function renderAll(rows){
+      renderSummary(rows);
+      renderTable(rows);
+    }
+
+    function renderSummary(rows){
+      if(rows.length === 0){ summarySection.style.display = 'none'; return; }
+      summarySection.style.display = '';
+      clearChildren(summaryGrid);
+
+      let sumPct = 0, avgCount = 0;
+      const perType = {};
+      PROBLEM_TYPES.forEach(t => { perType[t.key] = { correct: 0, incorrect: 0 }; });
+
+      rows.forEach(row => {
+        const score = Number(row.Score), total = Number(row.Total);
+        if(Number.isFinite(score) && Number.isFinite(total) && total > 0){
+          sumPct += (score/total) * 100;
+          avgCount++;
+        }
+
+        let problems = [], answers = [];
+        try { problems = JSON.parse(row.ProblemsJSON || '[]'); } catch(e) {}
+        try { answers  = JSON.parse(row.AnswersJSON  || '[]'); } catch(e) {}
+
+        problems.forEach((p, i) => {
+          const bucket = p && perType[p.type];
+          if(!bucket) return; // unknown/legacy type — excluded from the breakdown
+          const raw = answers[i] && answers[i].raw;
+          if(isAnswerCorrect(raw, p)) bucket.correct++; else bucket.incorrect++;
+        });
+      });
+
+      const avgPct = avgCount ? (sumPct / avgCount) : null;
+
+      summaryGrid.appendChild(statCard('Submissions', String(rows.length), ''));
+      summaryGrid.appendChild(statCard(
+        'Class Average',
+        avgPct == null ? '—' : `${avgPct.toFixed(1)}%`,
+        avgCount ? `across ${avgCount} graded submission${avgCount===1?'':'s'}` : ''
+      ));
+
+      PROBLEM_TYPES.forEach(t => {
+        const b = perType[t.key];
+        const attempted = b.correct + b.incorrect;
+        const pct = attempted ? Math.round((b.correct/attempted)*100) : null;
+        summaryGrid.appendChild(statCard(
+          t.label,
+          attempted ? `${b.correct}/${attempted} correct` : '—',
+          attempted ? `${pct}% correct · ${b.incorrect} missed` : 'not attempted'
+        ));
+      });
+    }
+
+    function statCard(label, value, sub){
+      const card = document.createElement('div');
+      card.className = 'stat-card';
+      const l = document.createElement('div'); l.className = 'label'; l.textContent = label;
+      const v = document.createElement('div'); v.className = 'value'; v.textContent = value;
+      card.appendChild(l); card.appendChild(v);
+      if(sub){ const s = document.createElement('div'); s.className = 'sub'; s.textContent = sub; card.appendChild(s); }
+      return card;
+    }
+
+    function renderTable(rows){
+      clearChildren(rowsTbody);
+      if(rows.length === 0){ tableSection.style.display = 'none'; return; }
+      tableSection.style.display = '';
+
+      const sorted = rows.slice().sort((a,b) => {
+        const ta = Date.parse(a.Timestamp), tb = Date.parse(b.Timestamp);
+        if(Number.isFinite(ta) && Number.isFinite(tb)) return tb - ta;
+        return String(b.Timestamp).localeCompare(String(a.Timestamp));
+      });
+
+      sorted.forEach(row => {
+        const tr = document.createElement('tr');
+        tr.appendChild(td(normalizeDate(row.Date)));
+        tr.appendChild(td(row.SNumber != null ? String(row.SNumber) : ''));
+        tr.appendChild(td(`${row.Score != null ? row.Score : '—'} / ${row.Total != null ? row.Total : '—'}`));
+
+        const ts = Date.parse(row.Timestamp);
+        tr.appendChild(td(Number.isFinite(ts) ? new Date(ts).toLocaleString() : String(row.Timestamp || '')));
+
+        rowsTbody.appendChild(tr);
+      });
+    }
+
+    function td(text){
+      const cell = document.createElement('td');
+      cell.textContent = text;
+      return cell;
+    }
+
+    // ======= Init & Events =======
+    teacherSelect.addEventListener('change', () => {
+      const name = teacherSelect.value;
+      if(!name) return;
+      try { localStorage.setItem(STORAGE_KEY, name); } catch(e) {}
+      loadRows(name);
+    });
+    dateFromEl.addEventListener('change', applyFilterAndRender);
+    dateToEl.addEventListener('change', applyFilterAndRender);
+
+    loadTeachers();
+  </script>
+</body>
+</html>
