@@ -284,10 +284,7 @@
               <input class="answer" id="ans-${i}" type="text" placeholder="e.g., (x+3)(x+4) or -1(x-2)(x-3)" />
             </div>
             <div class="meta" id="msg-${i}" style="min-height:22px; margin-top:6px"></div>
-            <details id="sol-${i}" class="solution" style="display:none">
-              <summary>Show solution</summary>
-              <div class="meta" style="margin-top:6px">One factored form: <strong>${p.sample}</strong></div>
-            </details>
+            <div id="sol-${i}"></div>
           </article>`;
       }).join('');
       window.__currentSet = set;
@@ -299,6 +296,14 @@
     function isMonomial(poly){ return (poly[0]!==0) + (poly[1]!==0) + (poly[2]!==0) === 1; }
     function degree(poly){ return poly[2]!==0 ? 2 : (poly[1]!==0 ? 1 : (poly[0]!==0 ? 0 : -Infinity)); }
     function monomialCoefPow(poly){ if(poly[2]!==0) return {coef:poly[2], pow:2}; if(poly[1]!==0) return {coef:poly[1], pow:1}; return {coef:poly[0], pow:0}; }
+
+    function revealSolution(sol, p){
+      sol.innerHTML = `
+        <details class="solution">
+          <summary>Show solution</summary>
+          <div class="meta" style="margin-top:6px">One factored form: <strong>${p.sample}</strong></div>
+        </details>`;
+    }
 
     function checkAnswers(){
       if(!window.__currentSet) return;
@@ -315,15 +320,15 @@
 
         if(!inp){
           msg.innerHTML = '<span class="warn">Enter an answer.</span>';
-          sol.style.display = 'none';
+          sol.innerHTML = '';
           continue;
         }
 
         const parsed = expandExpression(inp);
-        if(!parsed){ msg.innerHTML = '<span class="err">Could not parse. Use forms like (x+3)(2x-1) with parentheses.</span>'; sol.style.display='block'; inpEl.disabled = true; continue; }
+        if(!parsed){ msg.innerHTML = '<span class="err">Could not parse. Use forms like (x+3)(2x-1) with parentheses.</span>'; revealSolution(sol, set[i]); inpEl.disabled = true; continue; }
         if(!polyEqual(parsed.poly, [target[0],target[1],target[2]])){
           msg.innerHTML = '<span class="err">Does not expand to the original polynomial.</span>';
-          sol.style.display = 'block';
+          revealSolution(sol, set[i]);
           inpEl.disabled = true;
           continue;
         }
@@ -338,7 +343,7 @@
         if(gCoef>1 || gPow>0){
           if(!(monAbs===gCoef && monP===gPow)){
             msg.innerHTML = `<span class="err">Factor out the GCF first: expected <strong>${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''}</strong> outside.</span>`;
-            sol.style.display='block'; inpEl.disabled=true; continue;
+            revealSolution(sol, set[i]); inpEl.disabled=true; continue;
           }
         }
 
@@ -348,19 +353,19 @@
           const allLinear = nonMono.every(f => degree(f) === 1);
           if(nonMono.length < 2 || !allLinear){
             msg.innerHTML = '<span class="err">Fully factor the quadratic into linear factors (no 1·(quadratic)).</span>';
-            sol.style.display='block'; inpEl.disabled=true; continue;
+            revealSolution(sol, set[i]); inpEl.disabled=true; continue;
           }
         }else{
           // For GCF-only problems, at least show as a product (GCF)*(something)
           const hasProduct = parsed.factorPolys.length >= 2;
           if(!hasProduct){
             msg.innerHTML = '<span class="err">Write your answer as a product with the GCF factored out.</span>';
-            sol.style.display='block'; inpEl.disabled=true; continue;
+            revealSolution(sol, set[i]); inpEl.disabled=true; continue;
           }
         }
 
         msg.innerHTML = '<span class="ok">Correct ✔</span>';
-        sol.style.display = 'block';
+        revealSolution(sol, set[i]);
         inpEl.disabled = true;
         correct++;
       }
