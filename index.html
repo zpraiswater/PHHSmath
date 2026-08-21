@@ -153,9 +153,18 @@
     // Build the inner factor by actually dividing by gCoef * x^gPow
       const inner = divideByScalarAndXPow(poly, gCoef, gPow); // [const, x, x^2] after division
 
-      const sample = `(${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''})(${polyToHTML(inner[2], inner[1], inner[0])})`;
+      const gcfTerm = `${gCoef}${gPow>0?`x${gPow===1?'':`^${gPow}`}`:''}`;
+      const originalHTML = polyToHTML(poly[2], poly[1], poly[0]);
+      const innerHTML = polyToHTML(inner[2], inner[1], inner[0]);
+      const sample = `(${gcfTerm})(${innerHTML})`;
 
-      return makeProblem(poly, sample, 'GCF');
+      const steps = [
+        `The GCF of every term in ${originalHTML} is ${gcfTerm}.`,
+        `Divide each term by ${gcfTerm}: ${originalHTML} ÷ ${gcfTerm} = ${innerHTML}.`,
+        `Write the GCF outside a set of parentheses containing the result: ${sample}.`
+      ];
+
+      return makeProblem(poly, sample, 'GCF', steps);
     }
 
 
@@ -168,7 +177,14 @@
       const A=a*a, C=-(b*b);
       const poly = [C, 0, A];
       const sample = `(${a}x - ${b})(${a}x + ${b})`;
-      return makeProblem(poly, sample, 'DIFF');
+      const squareTermHTML = polyToHTML(A, 0, 0);
+
+      const steps = [
+        `${a}x is squared to get ${squareTermHTML}, and ${b} is squared to get ${b*b}, so this is a difference of squares with u = ${a}x and v = ${b}.`,
+        `Apply the pattern u² - v² = (u - v)(u + v): ${sample}.`
+      ];
+
+      return makeProblem(poly, sample, 'DIFF', steps);
     }
 
     function genTrinomialA1(rand){
@@ -177,7 +193,14 @@
       const b = m + n; const c = m * n;
       const poly = [c, b, 1];
       const sample = `(x ${m>=0?'+':''}${m})(x ${n>=0?'+':''}${n})`;
-      return makeProblem(poly, sample, 'A1');
+
+      const steps = [
+        `Find two numbers that multiply to ${c} and add to ${b}.`,
+        `${m} and ${n} work: ${m} × ${n} = ${c} and ${m} ${n>=0?'+':''}${n} = ${b}.`,
+        `Write the binomials using those two numbers: ${sample}.`
+      ];
+
+      return makeProblem(poly, sample, 'A1', steps);
     }
 
     function genTrinomialAGt1(rand){
@@ -221,14 +244,27 @@
   const b = p * s + q * r;
   const poly = [c, b, a];
   const sample = `(${p}x ${r>=0?'+':''}${r})(${q}x ${s>=0?'+':''}${s})`;
-  
-  return makeProblem(poly, sample, 'AGT1');
+
+  // ac-method: t1,t2 are the two numbers that split the middle term — their
+  // product is a*c and their sum is b (t1=p*s, t2=q*r, since (pq)(rs) = (ps)(qr)).
+  const productAC = a * c;
+  const t1 = p * s, t2 = q * r;
+  const trinomialHTML = polyToHTML(a, b, c);
+  const steps = [
+    `Multiply a and c: ${a} × ${c} = ${productAC}; find two numbers that multiply to ${productAC} and add to ${b}.`,
+    `${t1} and ${t2} work: ${t1} × ${t2} = ${productAC} and ${t1} ${t2>=0?'+':''}${t2} = ${b}.`,
+    `Split the middle term: ${trinomialHTML} = ${a}x<sup>2</sup> ${t1>=0?'+':''}${t1}x ${t2>=0?'+':''}${t2}x ${c>=0?'+':''}${c}.`,
+    `Group and factor each pair to get ${p}x(${q}x ${s>=0?'+':''}${s}) ${r>=0?'+':''}${r}(${q}x ${s>=0?'+':''}${s}).`,
+    `Factor out the shared (${q}x ${s>=0?'+':''}${s}) to get ${sample}.`
+  ];
+
+  return makeProblem(poly, sample, 'AGT1', steps);
 }
 
-    function makeProblem(coeffs, sample, kind){
+    function makeProblem(coeffs, sample, kind, steps){
       const gCoef = polyGcdCoef(coeffs);
       const gPow  = polyGcdVarPow(coeffs);
-      return { coeffs, sample, gCoef, gPow, kind };
+      return { coeffs, sample, gCoef, gPow, kind, steps };
     }
 
     // ======= Deterministic set =======
@@ -341,9 +377,13 @@
     function monomialCoefPow(poly){ if(poly[2]!==0) return {coef:poly[2], pow:2}; if(poly[1]!==0) return {coef:poly[1], pow:1}; return {coef:poly[0], pow:0}; }
 
     function revealSolution(sol, p){
+      const stepsHTML = (p.steps && p.steps.length)
+        ? `<ol class="meta" style="margin:6px 0 0; padding-left:20px">${p.steps.map(s => `<li>${s}</li>`).join('')}</ol>`
+        : '';
       sol.innerHTML = `
         <details class="solution">
           <summary>Show solution</summary>
+          ${stepsHTML}
           <div class="meta" style="margin-top:6px">One factored form: <strong>${p.sample}</strong></div>
         </details>`;
     }
